@@ -1,5 +1,5 @@
 import torch
-import utils
+import Utils.ComputingUtils as ComputingUtils
 import State
 from Prepare import *
 
@@ -15,7 +15,7 @@ def step1(Chol_Sigma_U: torch.Tensor,
     for ind, i in enumerate(State.J):
         mu_C = State.lambda_c[ind]*State.G[i]
         mu_C[0] += State.mu_c
-        u = utils.draw_standard_normal(q+1)
+        u = ComputingUtils.draw_standard_normal(q+1)
         u = torch.sqrt(s2[ind])*torch.matmul(Chol_Sigma_U[State.ind_theta_c[ind]],
                                               u)+mu_C
         State.C[ind] = u - torch.matmul(SuAA[:,:,State.ind_theta_c[ind], ind],
@@ -24,7 +24,7 @@ def step1(Chol_Sigma_U: torch.Tensor,
             fhat += weights[ind]*State.C[ind]
             sVs += weights[ind]**2*s2[ind]*SuAAS[:,:,State.ind_theta_c[ind],ind]
     
-    e = utils.draw_standard_normal(q+1)
+    e = ComputingUtils.draw_standard_normal(q+1)
     e = State.Y0+torch.matmul(torch.linalg.cholesky(Delta), e)
     fhat = torch.matmul(torch.linalg.inv(sVs+Delta), fhat-e)
     
@@ -52,7 +52,7 @@ def step2(Sigma_U_inv: torch.Tensor): # G
     
     for i,V in enumerate(V_g):
         inv_V = torch.linalg.inv(V)
-        g = utils.draw_standard_normal(q+1)
+        g = ComputingUtils.draw_standard_normal(q+1)
         State.G[i] = torch.matmul(torch.linalg.cholesky(inv_V),
                                    g)+torch.matmul(inv_V, ms[i])
 
@@ -73,7 +73,7 @@ def step3(Sigma_U_inv): # H
         
     for k,V in enumerate(V_h):
         inv_V = torch.linalg.inv(V)
-        h = utils.draw_standard_normal(q+1)
+        h = ComputingUtils.draw_standard_normal(q+1)
         State.H[k] = torch.matmul(torch.linalg.cholesky(inv_V),
                                   h)+torch.matmul(inv_V,ms[k])
         
@@ -92,7 +92,7 @@ def step4(Sigma_U_inv: torch.Tensor,
         for l in range(1,25):
             prob[l] += prob[l-1]
         prob = prob/prob[-1]
-        l_ind = utils.draw_proportional(prob)
+        l_ind = ComputingUtils.draw_proportional(prob)
         State.lambda_c[ind] = lambda_grid[l_ind]
 
 def step5(Sigma_U_inv: torch.Tensor,
@@ -109,7 +109,7 @@ def step5(Sigma_U_inv: torch.Tensor,
         for l in range(1,len(lambda_grid)):
             prob[l] += prob[l-1]
         prob = prob/prob[-1]
-        l_ind = utils.draw_proportional(prob)
+        l_ind = ComputingUtils.draw_proportional(prob)
         State.lambda_g[i] = lambda_grid[l_ind]
 
 def step6(lambda_grid: torch.Tensor): # p_c_lambda
@@ -150,7 +150,7 @@ def step8(Sigma_U_inv: torch.Tensor,
         for l in range(1,len(kappa_grid)):
             prob[l] += prob[l-1]
         prob = prob/prob[-1]
-        k_ind = utils.draw_proportional(prob)
+        k_ind = ComputingUtils.draw_proportional(prob)
         State.kappa_c2[ind] = kappa_grid[k_ind]
         
 def step9(Sigma_U_inv: torch.Tensor,
@@ -170,7 +170,7 @@ def step9(Sigma_U_inv: torch.Tensor,
         for l in range(1,len(kappa_grid)):
             prob[l] += prob[l-1]
         prob = prob/prob[-1]
-        k_ind = utils.draw_proportional(prob)
+        k_ind = ComputingUtils.draw_proportional(prob)
         State.kappa_g2[i] = kappa_grid[k_ind]
 
 def step10(Sigma_U_inv: torch.Tensor,
@@ -189,7 +189,7 @@ def step10(Sigma_U_inv: torch.Tensor,
         for l in range(1,len(kappa_grid)):
             prob[l] += prob[l-1]
         prob = prob/prob[-1]
-        k_ind = utils.draw_proportional(prob)
+        k_ind = ComputingUtils.draw_proportional(prob)
         State.kappa_h2[k] = kappa_grid[k_ind]
 
 def step11(kappa_grid: torch.Tensor): # p_c_kappa
@@ -237,7 +237,7 @@ def step14(Sigma_U_inv: torch.Tensor): # K
         for k in range(1,10):
             prob[k] += prob[k-1]
         prob = prob/prob[-1]
-        State.K[i] = utils.draw_proportional(prob)
+        State.K[i] = ComputingUtils.draw_proportional(prob)
 
 def step15(Sigma_U_inv: torch.Tensor): # J
     prob = torch.zeros(25)
@@ -253,7 +253,7 @@ def step15(Sigma_U_inv: torch.Tensor): # J
         for i in range(1,25):
             prob[i] += prob[k-1]
         prob = prob/prob[-1]
-        State.J[ind] = utils.draw_proportional(prob)
+        State.J[ind] = ComputingUtils.draw_proportional(prob)
 
 def step16(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_c
@@ -262,7 +262,7 @@ def step16(Sigma_U_inv: torch.Tensor,
     for ind,i in enumerate(State.J):
         meas[ind] = State.C[ind]-State.lambda_c[ind]*State.G[i]
         meas[ind][0] -= State.mu_c
-    State.ind_theta_c = utils.draw_index(meas, State.p_c_theta, s2, Sigma_U_inv, Det_Sigma_U)
+    State.ind_theta_c = ComputingUtils.draw_index(meas, State.p_c_theta, s2, Sigma_U_inv, Det_Sigma_U)
 
 def step17(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_g
@@ -270,7 +270,7 @@ def step17(Sigma_U_inv: torch.Tensor,
     s2 = (1-State.lambda_g**2)*State.kappa_g2*State.omega2
     for i,k in enumerate(State.K):
         meas[i] = State.G[i]-State.lambda_g[i]*State.H[k]
-    State.ind_theta_g = utils.draw_index(meas, State.p_g_theta, s2, Sigma_U_inv, Det_Sigma_U)
+    State.ind_theta_g = ComputingUtils.draw_index(meas, State.p_g_theta, s2, Sigma_U_inv, Det_Sigma_U)
 
 def step18(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_h
@@ -278,7 +278,7 @@ def step18(Sigma_U_inv: torch.Tensor,
     s2 = State.kappa_h2*State.omega2
     for i,h in enumerate(State.H):
         meas[i] = h
-    State.ind_theta_h = utils.draw_index(meas, State.p_h_theta, s2, Sigma_U_inv, Det_Sigma_U)
+    State.ind_theta_h = ComputingUtils.draw_index(meas, State.p_h_theta, s2, Sigma_U_inv, Det_Sigma_U)
 
 def step19(no_thetas: int): # p_c_theta
     a = torch.ones(no_thetas)*20/no_thetas
@@ -316,7 +316,7 @@ def step22(Sigma_U_inv: torch.Tensor): # mu_c
             [i_1.t(), Sigma_U_inv[State.ind_theta_c[ind]], u])/s2[ind]
         prec += torch.linalg.multi_dot(
             [i_1.t(), Sigma_U_inv[State.ind_theta_c[ind]], i_1])/s2[ind]
-    v = utils.draw_standard_normal(1)
+    v = ComputingUtils.draw_standard_normal(1)
     v = m/prec+v/torch.sqrt(prec)
     State.mu_c = v[0]
 
@@ -351,7 +351,7 @@ def step24(Sigma_m: torch.Tensor,
 
     prec = Sigma_F_inv[:2,:2]
     m = torch.matmul(Sigma_F_inv[:2], State.F)
-    v = utils.draw_standard_normal(2)
+    v = ComputingUtils.draw_standard_normal(2)
     v = torch.matmul(prec,m)+torch.matmul(
         torch.linalg.cholesky(prec), v)
     State.f0 = v[0]
@@ -381,7 +381,7 @@ def step25(Sigma_m: torch.Tensor,
     fhat[0] -= State.f0
     fhat[1] -= State.mu_m
     m += torch.matmul(Deltainv, fhat-State.Y0)
-    v = utils.draw_standard_normal(q+1)
+    v = ComputingUtils.draw_standard_normal(q+1)
     State.F = torch.matmul(V_F, m)+torch.matmul(
         torch.linalg.cholesky(V_F), v)
     State.F[0] += State.f0
@@ -397,7 +397,7 @@ def step26(Sigma_m: torch.Tensor,
     u[0] -= State.f0
     u[1] -= State.mu_m
     mfm = torch.matmul(Sig_m, torch.linalg.inv(Sigma_S))
-    v = utils.draw_standard_normal(q+1)
+    v = ComputingUtils.draw_standard_normal(q+1)
     State.S_m = torch.matmul(mfm,u)+torch.matmul(
         torch.linalg.cholesky(Sig_m-torch.matmul(mfm,Sig_m)), v)
     
@@ -420,7 +420,7 @@ def step27(sigma_grid: torch.Tensor,
         prob[l] += prob[l-1]
 
     prob = prob/prob[-1]
-    s_ind = utils.draw_proportional(prob)
+    s_ind = ComputingUtils.draw_proportional(prob)
     State.sigma_m2 = sigma_grid[s_ind]
 
     u = State.F-State.S_m
@@ -445,4 +445,4 @@ def step28(Sigma_m_inv: torch.Tensor,
     for i in range(1,no_rhos):
         prob[i] += prob[i-1]
     prob = prob/prob[-1]
-    State.ind_rho = utils.draw_proportional(prob)
+    State.ind_rho = ComputingUtils.draw_proportional(prob)
