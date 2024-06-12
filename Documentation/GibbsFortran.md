@@ -25,7 +25,7 @@
 - For $i = 1$ to $25$:
     - $cindCF(i) = (i-1) mod100 + 1$
     - $G_i = 0$
-    - $K(i) = (i-1)mod25 + 1$
+    - $K(i) = (i-1)mod10 + 1$
 - For $ir = 1$ to $n$:
     - $J(ir) = (ir-1) mod25+1$
     - $cindu(ir) = cindCF(J(ir))$
@@ -43,7 +43,7 @@
     - $\mu_C = \lambda_{c,ir}*G_i$
     - $\mu_C[0] += \mu_c$
     - $u \sim N(0, I)$ **(length of $u$: 32)**
-    - $u = s*(cholesky(\Sigma_U(\theta_{c,ir}^u)) * u)+m$
+    - $u = s*(cholesky(\Sigma_U(\theta_{c,ir}^u)) * u)+\mu_C$
     - $C_{ir} = u - (SuAA(:,:,cindu(ir), ir)*(u-C_{ir}))$
     - If $fwheights(ir) > 0$:
         - $fhat = fhat +fweights(ir)*C_{ir}$
@@ -54,7 +54,7 @@
 - For $ir = 1$ to $n$:
     - If $fweigths(ir) > 0$:
         - $s^2 = (1-\lambda_{c,ir}^2)*\kappa_{c,ir}^2*\omega^2$
-        - $C_{ir} = C_{ir}-fweights(ir)*s^2*(SuAAS(:,:,cindu(ir),ir), fhat)$
+        - $C_{ir} = C_{ir}-fweights(ir)*s^2*SuAAS(:,:,cindu(ir),ir)* fhat$
     - $X_{ir} = C_{ir}+F$
 
 ## Step 2: $\{G_j\}_{j=1}^{25}$
@@ -87,7 +87,7 @@
 - For $k=1$ to $10$:
     - $V_{h,k} = V_{h,k}^{-1}$
     - $H_k \sim N(0,I)$
-    - $H_k = cholesky(V_{h,k}*H_k)+V_{h,k}*ms(:,k)$
+    - $H_k = cholesky(V_{h,k})*H_k+V_{h,k}*ms(:,k)$
 
 ## Step 4: $\{\lambda_{c,i}\}_{i=1}^n$
 - For $ir=1$ to $n$:
@@ -225,7 +225,7 @@
 ## Step 14: $\{K(j)\}_{j=1}^{25}$
 - For $i=1$ to $25$:
     - $v = G_i$
-    - $s^2 = (1-\lambda{g,i}^2)*\kappa_{g,i}^2*\omega^2$
+    - $s^2 = (1-\lambda_{g,i}^2)*\kappa_{g,i}^2*\omega^2$
     - For $k=1$ to $10$:
         - $u = v-\lambda_{g,i}*H_k$
         - $p_k = -0.5*\frac{u^T*\Sigma_U^{-1}(\theta_{g,i}^u)*u}{s^2}$
@@ -395,12 +395,12 @@
 
 ## Step 26: $S_m$
 - $\Sigma_m = \sigma_m^2*\Sigma_m(\rho_m)$
-- $\Sigma_F = \Sigma_m +\sigma_{\Delta a}^2*\Sigma_a$
+- $\Sigma_s = \Sigma_m +\sigma_{\Delta a}^2*\Sigma_a$
 - $u = F$
 - $u[0:1] = u[0:1]-(f_0,\mu_m)$
-- $mfm = \Sigma_m*\Sigma_F^{-1}$
+- $mfm = \Sigma_m*\Sigma_s^{-1}$
 - $S_m \sim N(0,I)$
-- $S_m = mfm*u+cholesky(\Sigma_s-mfm*\Sigma_s)*S_m$
+- $S_m = mfm*u+cholesky(\Sigma_m-mfm*\Sigma_m)*S_m$
 
 ## Step 27: $(\sigma_m^2, \sigma_{\Delta a}^2)$
 - $usu = S_m^T*\Sigma_m^{-1}(\rho_m)*S_m$

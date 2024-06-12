@@ -15,15 +15,16 @@ X = None
 C = None
 Y0 = None
 sigma_m2 = 0
+sigma_Da2 = 0
 ind_rho = 0
 mu_c = 0
 omega2 = 0
 f0 = 0
 mu_m = 0
 
-kappa_c = None
-kappa_g = None
-kappa_h = None
+kappa_c2 = None
+kappa_g2 = None
+kappa_h2 = None
 
 lambda_c = None
 lambda_g = None

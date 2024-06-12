@@ -23,7 +23,10 @@ class Region:
         self.w = None
         self.AApAi = None
 
-def grids(no_kappas: int=25, no_lambdas: int=25, no_rhos: int=25):
+def grids(no_kappas: int=25, 
+          no_lambdas: int=25, 
+          no_rhos: int=25,
+          no_sigmas: int = 25):
     kappa_grid = torch.tensor([
         1/3*3**(2*i/(no_kappas-1)) for i in range(no_kappas)
     ])
@@ -33,7 +36,11 @@ def grids(no_kappas: int=25, no_lambdas: int=25, no_rhos: int=25):
     rho_grid = torch.tensor([
         0.5**(1/(50+i)*100/24) for i in range(no_rhos)
     ])
-    return kappa_grid, lambda_grid, rho_grid
+    # (0.01*[(0.1+(2-0.1)*(i-1)/(ns2fm-1),i=1,ns2fm)])**2
+    sigma_grid = torch.tensor([
+        0.01*(0.1+1.9*i/(no_sigmas-1)) for i in range(no_sigmas)
+    ])
+    return kappa_grid, lambda_grid, rho_grid, sigma_grid
 
 def largest_eigenvecs(A: torch.Tensor, no_Vecs:int):
     eigvals, eigvecs = torch.linalg.eigh(A)
@@ -280,4 +287,4 @@ def loadRegions(no_thetas: int,
         filtered = torch.where(~torch.isnan(leveldata[:,i]), leveldata[:,i], torch.tensor(1))
         r.Y = torch.matmul(r.w.t(), torch.log(filtered))
     
-    return regions, F, SuAA, SuAAS
+    return regions, F, SuAA, SuAAS, weights
