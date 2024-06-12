@@ -1,3 +1,7 @@
+"""
+Variables for the state of the Gibbs Sampler
+"""
+
 p_c_kappa = None
 p_g_kappa = None
 p_h_kappa = None

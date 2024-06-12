@@ -2,6 +2,7 @@ import torch
 import statsmodels.api as sm
 import csv
 import State
+import PreComputed
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -36,7 +37,7 @@ def grids(no_kappas: int=25,
     rho_grid = torch.tensor([
         0.5**(1/(50+i)*100/24) for i in range(no_rhos)
     ])
-    # (0.01*[(0.1+(2-0.1)*(i-1)/(ns2fm-1),i=1,ns2fm)])**2
+    
     sigma_grid = torch.tensor([
         0.01*(0.1+1.9*i/(no_sigmas-1)) for i in range(no_sigmas)
     ])
@@ -288,3 +289,27 @@ def loadRegions(no_thetas: int,
         r.Y = torch.matmul(r.w.t(), torch.log(filtered))
     
     return regions, F, SuAA, SuAAS, weights
+
+def precompute(pop_path: str,
+               yp_path: str):
+    PreComputed.kappa_grid, PreComputed.lambda_grid, PreComputed.rho_grid, PreComputed.sigma_grid = grids(
+        PreComputed.no_kappas,
+        PreComputed.no_lambdas,
+        PreComputed.no_rhos,
+        PreComputed.no_sigmas
+    )
+    
+    Xraw, R, PreComputed.Delta, PreComputed.Deltainv, Xfcstf, cutoff, G, V = baseline_trend(PreComputed.Deltavar)
+
+    PreComputed.Sigma_m, PreComputed.Sigma_m_inv, PreComputed.Det_Sigma_m, Chol_Sigma_m, mfcstfm, cholfcstfm, ssv, ssh = Sigma_M(
+        PreComputed.rho_grid, R)
+    
+    PreComputed.Sigma_A, PreComputed.Sigma_A_inv, Chol_Sigma_A, mfcstfa, cholfcstfa = Sigma_a(R)
+
+    gammas, half_life_dist, theta = thetas(PreComputed.no_thetas)
+
+    Sigma_U, PreComputed.Sigma_U_inv, PreComputed.Chol_Sigma_U, PreComputed.Det_Sigma_U,  mfcstu, cholfcstu, Sfcstu = Sigma_Us(
+        gammas,R,PreComputed.no_thetas)
+    
+    PreComputed.regions, F, PreComputed.SuAA, PreComputed.SuAAS, PreComputed.weights = loadRegions(
+        PreComputed.no_thetas, pop_path,yp_path,R,V,cutoff,Xraw,Sigma_U)
