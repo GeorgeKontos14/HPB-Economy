@@ -47,37 +47,37 @@ ind_theta_h_draws = []
 
 # Paths to csv files:
 paths = {
-    "p_c_kappa_draws" : "Results/Distributions/p_c_kappa.csv",
-    "p_g_kappa_draws" : "Results/Distributions/p_g_kappa.csv",
-    "p_h_kappa_draws" : "Results/Distributions/p_h_kappa.csv",
-    "p_c_theta_draws" : "Results/Distributions/p_c_theta.csv",
-    "p_g_theta_draws" : "Results/Distributions/p_g_theta.csv",
-    "p_h_theta_draws" : "Results/Distributions/p_h_theta.csv",
-    "p_c_lambda_draws" : "Results/Distributions/p_c_lambda.csv",
-    "p_g_lambda_draws" : "Results/Distributions/p_g_lambda.csv",
-    "F_draws" : "Results/F.csv",
-    "S_m_draws" : "Results/S_m.csv",
-    "X_draws" : "Results/X.csv",
-    "C_draws" : "Results/C.csv",
-    "sigma_m2_draws" : "Results/sigma_m2.csv",
-    "sigma_Da2_draws" : "Results/sigma_Da2.csv",
-    "ind_rho_draws" : "Results/ind_rho.csv",
-    "mu_c_draws" : "Results/mu_c.csv",
-    "omega2_draws" : "Results/omega2.csv",
-    "f0_draws" : "Results/f0.csv",
-    "mu_m_draws" : "Results/mu_m.csv",
-    "kappa_c2_draws" : "Results/Kappas/kappa_c2.csv",
-    "kappa_g2_draws" : "Results/Kappas/kappa_g2.csv",
-    "kappa_h2_draws" : "Results/Kappas/kappa_h2.csv",
-    "lambda_c_draws" : "Results/Lambdas/lambda_c.csv",
-    "lambda_g_draws" : "Results/Lambdas/lambda_g.csv",
-    "G_draws" : "Results/G.csv",
-    "H_draws" : "Results/H.csv",
-    "K_draws" : "Results/K.csv",
-    "J_draws" : "Results/J.csv",
-    "ind_theta_c_draws" : "Results/Thetas/theta_c.csv",
-    "ind_theta_g_draws" : "Results/Thetas/theta_g.csv",
-    "ind_theta_h_draws" : "Results/Thetas/theta_h.csv"
+    "p_c_kappa_draws" : ["Results/Distributions/p_c_kappa.csv",True],
+    "p_g_kappa_draws" : ["Results/Distributions/p_g_kappa.csv",True],
+    "p_h_kappa_draws" : ["Results/Distributions/p_h_kappa.csv",True],
+    "p_c_theta_draws" : ["Results/Distributions/p_c_theta.csv",True],
+    "p_g_theta_draws" : ["Results/Distributions/p_g_theta.csv",True],
+    "p_h_theta_draws" : ["Results/Distributions/p_h_theta.csv",True],
+    "p_c_lambda_draws" : ["Results/Distributions/p_c_lambda.csv",True],
+    "p_g_lambda_draws" : ["Results/Distributions/p_g_lambda.csv",True],
+    "F_draws" : ["Results/F.csv",True],
+    "S_m_draws" : ["Results/S_m.csv",True],
+    "X_draws" : ["Results/X.csv",True],
+    "C_draws" : ["Results/C.csv",True],
+    "sigma_m2_draws" : ["Results/sigma_m2.csv",False],
+    "sigma_Da2_draws" : ["Results/sigma_Da2.csv",False],
+    "ind_rho_draws" : ["Results/ind_rho.csv",False],
+    "mu_c_draws" : ["Results/mu_c.csv",False],
+    "omega2_draws" : ["Results/omega2.csv",False],
+    "f0_draws" : ["Results/f0.csv",False],
+    "mu_m_draws" : ["Results/mu_m.csv",False],
+    "kappa_c2_draws" : ["Results/Kappas/kappa_c2.csv",True],
+    "kappa_g2_draws" : ["Results/Kappas/kappa_g2.csv",True],
+    "kappa_h2_draws" : ["Results/Kappas/kappa_h2.csv",True],
+    "lambda_c_draws" : ["Results/Lambdas/lambda_c.csv",True],
+    "lambda_g_draws" : ["Results/Lambdas/lambda_g.csv",True],
+    "G_draws" : ["Results/G.csv",True],
+    "H_draws" : ["Results/H.csv",True],
+    "K_draws" : ["Results/K.csv",True],
+    "J_draws" : ["Results/J.csv",True],
+    "ind_theta_c_draws" : ["Results/Thetas/theta_c.csv",True],
+    "ind_theta_g_draws" : ["Results/Thetas/theta_g.csv",True],
+    "ind_theta_h_draws" : ["Results/Thetas/theta_h.csv",True]
 }
 
 def clear_files():
@@ -86,4 +86,8 @@ def clear_files():
 
 def write():
     for var, path in paths.items():
-        FileUtils.write_to_file(globals()[var], path)
+        FileUtils.write_to_file(globals()[var], path[0])
+
+def read():
+    for var,path in paths.items():
+        globals()[var] = FileUtils.read_from_file(path[0],path[1])

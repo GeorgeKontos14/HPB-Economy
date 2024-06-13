@@ -313,3 +313,5 @@ def precompute(pop_path: str,
     
     PreComputed.regions, F, PreComputed.SuAA, PreComputed.SuAAS, PreComputed.weights = loadRegions(
         PreComputed.no_thetas, pop_path,yp_path,R,V,cutoff,Xraw,Sigma_U)
+    
+    return theta.t()

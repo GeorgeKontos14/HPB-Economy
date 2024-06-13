@@ -4,11 +4,13 @@ from Steps import *
 from Draw import *
 import PreComputed
 import Store
+import Utils.FileUtils as FileUtils
 
 pop_path = 'Data/pop_raw.csv'
 yp_path = 'Data/yp_raw.csv'
-burn_in = 5
-total_draws = 40
+theta_path = 'Results/Thetas/theta.csv'
+burn_in = 25
+total_draws = 200
 save=True
 
 def main():
@@ -16,10 +18,10 @@ def main():
         Store.clear_files()
     start = time.time()
     # Prepare data
-    precompute(pop_path, yp_path)
+    theta = precompute(pop_path, yp_path)
     end = time.time()
     print(f"Preparations: {end-start}")
-
+    FileUtils.write_mat(theta, theta_path)
     start = time.time()
     # Initialize Gibbs state
     initialize(

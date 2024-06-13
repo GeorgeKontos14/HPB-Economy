@@ -76,3 +76,8 @@ def read_vals(input):
         for row in reader:
             data.append(float(row[0]))
     return data
+
+def read_from_file(input, isMat):
+    if isMat:
+        return read_matrices(input)
+    return read_vals(input)
