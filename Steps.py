@@ -1,6 +1,6 @@
 import torch
 import Utils.ComputingUtils as ComputingUtils
-import State
+import Variables.State as State
 from Prepare import *
 
 def step1(Chol_Sigma_U: torch.Tensor, 
@@ -440,8 +440,9 @@ def step28(Sigma_m_inv: torch.Tensor,
     u = State.S_m
     prob = torch.zeros(no_rhos)
     for i in range(no_rhos):
-        expon = -0.5/State.sigma_m2*torch.linalg.multi_dot([u.t(),Sigma_m_inv[i], u])
-        prob[i] = torch.exp(expon) # /Det_Sigma_m[i]**2
+        expon = -0.5/State.sigma_m2*torch.linalg.multi_dot(
+            [u.t(),Sigma_m_inv[i], u])+Det_Sigma_m[i]
+        prob[i] = torch.exp(expon)
     for i in range(1,no_rhos):
         prob[i] += prob[i-1]
     prob = prob/prob[-1]

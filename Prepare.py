@@ -1,8 +1,9 @@
 import torch
 import statsmodels.api as sm
 import csv
-import State
-import PreComputed
+import Variables.State as State
+import Variables.PreComputed as PreComputed
+import Utils.ComputingUtils as ComputingUtils
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -89,7 +90,7 @@ def Sigma_M(rho_grid: torch.Tensor, R: torch.Tensor):
     Sigma_m = torch.zeros((no_rhos, q+1, q+1))
     Sigma_m_inv = torch.zeros((no_rhos, q+1, q+1))
     Chol_Sigma_m = torch.zeros((no_rhos, q+1, q+1))
-    Det_Sigma_m = torch.zeros(no_rhos)
+    Det_Sigma_m = torch.zeros((no_rhos, 2))
     mfcstfm = torch.zeros(100,q+1,25)
     cholfcstfm = torch.zeros((100,100,25))
     ssv = torch.ones(Tmax)*(-1)
@@ -112,7 +113,9 @@ def Sigma_M(rho_grid: torch.Tensor, R: torch.Tensor):
         Sraw = torch.linalg.multi_dot([A, Sraw, A.t()])
         Sall = torch.linalg.multi_dot([R.t(), Sraw, R])
         S = Sall[:(q+1), :(q+1)]
-        Det_Sigma_m[i] = torch.linalg.det(S)
+        m, e = ComputingUtils.det(S)
+        Det_Sigma_m[i][0] = m
+        Det_Sigma_m[i][1] = e
         Sigma_m[i] = S
         Sigma_m_inv[i] = torch.linalg.inv(S)
         Chol_Sigma_m[i] = torch.linalg.cholesky(S)
@@ -120,6 +123,9 @@ def Sigma_M(rho_grid: torch.Tensor, R: torch.Tensor):
         cholfcstfm[:,:,i] = torch.linalg.cholesky(Sall[(q+1):, (q+1):]-torch.matmul(
             mfcstfm[:,:,i], Sall[:(q+1),(q+1):]))
 
+    Det_Sigma_m[:, 0] = torch.log(torch.abs(Det_Sigma_m[:,0]))
+    Det_Sigma_m[:, 1] = Det_Sigma_m[:, 1]*torch.log(torch.tensor(10))
+    Det_Sigma_m = -0.5*Det_Sigma_m[:, 0]-0.5*Det_Sigma_m[:, 1]
     return Sigma_m, Sigma_m_inv, Det_Sigma_m, Chol_Sigma_m, mfcstfm, cholfcstfm, ssv, ssh
 
 def Sigma_a(R: torch.Tensor):
@@ -174,7 +180,7 @@ def Sigma_Us(gammas: torch.Tensor, R: torch.Tensor, no_thetas: int=100):
     Sigma_U = torch.zeros((no_thetas, q+1, q+1))
     Sigma_U_inv = torch.zeros((no_thetas, q+1, q+1))
     Chol_Sigma_U = torch.zeros((no_thetas, q+1, q+1))
-    Det_Sigma_U = torch.zeros(no_thetas)
+    Det_Sigma_U = torch.zeros((no_thetas, 2))
     mfcstu = torch.zeros((100,q+1,100))
     cholfcstu = torch.zeros((100,100,100))
     Sfcstu = torch.zeros((100,100,100))
@@ -184,7 +190,9 @@ def Sigma_Us(gammas: torch.Tensor, R: torch.Tensor, no_thetas: int=100):
         Sall = torch.linalg.multi_dot([R.t(), Sraw, R])
         S = Sall[:(q+1),:(q+1)]
         Sigma_U[i,:,:] = S
-        Det_Sigma_U[i] = torch.linalg.det(S)
+        m, e = ComputingUtils.det(S)
+        Det_Sigma_U[i][0] = m
+        Det_Sigma_U[i][1] = e
         Chol_Sigma_U[i,:,:] = torch.linalg.cholesky(S)
         Sigma_U_inv[i,:,:] = torch.linalg.inv(S)
         mfcstu[:,:,i] = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_U_inv[i,:,:])
@@ -192,6 +200,9 @@ def Sigma_Us(gammas: torch.Tensor, R: torch.Tensor, no_thetas: int=100):
             mfcstu[:,:,i],Sall[:(q+1), (q+1):])
         cholfcstu[:,:,i] = torch.linalg.cholesky(Sfcstu[:,:,i])
 
+    Det_Sigma_U[:, 0] = torch.log(torch.abs(Det_Sigma_U[:,0]))
+    Det_Sigma_U[:, 1] = Det_Sigma_U[:, 1]*torch.log(torch.tensor(10))
+    Det_Sigma_U = -0.5*Det_Sigma_U[:, 0]-0.5*Det_Sigma_U[:, 1]
     return Sigma_U, Sigma_U_inv, Chol_Sigma_U, Det_Sigma_U, mfcstu, cholfcstu, Sfcstu
 
 def getlfweights(sel: torch.Tensor, 

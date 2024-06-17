@@ -1,7 +1,8 @@
 import torch
 from Steps import *
-import PreComputed
-import Store
+import Variables.PreComputed as PreComputed
+import Variables.Store as Store
+import Variables.State as State
 
 def initialize(regions: list[Region],
                no_kappas: int=25,

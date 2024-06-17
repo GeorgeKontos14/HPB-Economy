@@ -2,8 +2,8 @@ import time
 from Prepare import *
 from Steps import *
 from Draw import *
-import PreComputed
-import Store
+import Variables.PreComputed as PreComputed
+import Variables.Store as Store
 import Utils.FileUtils as FileUtils
 
 pop_path = 'Data/pop_raw.csv'
