@@ -153,7 +153,7 @@ def thetas(no_thetas: int=100):
         r = 2**(-1/hl)
         for j in range(kmax+1):
             corr[j] = r**j
-        gammas[:,i] = torch.matmul(corr, torch.tensor([x[2],1-x[2]]))
+        gammas[:,i] = torch.matmul(corr, torch.tensor([x[2],1-x[2]]).to(PreComputed.device))
         cond = gammas[1:, i] > 0.5
         half_life_dist[i] = cond.sum()
         theta[:,i] = torch.tensor([r[0],r[1],x[2]]).to(PreComputed.device)
