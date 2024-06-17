@@ -1,11 +1,12 @@
 import torch
+import Variables.PreComputed as PreComputed
 
 def draw_standard_normal(n: int):
     dist = torch.distributions.MultivariateNormal(torch.zeros(n), torch.eye(n))
-    return dist.sample()
+    return dist.sample().to(PreComputed.device)
 
 def draw_proportional(prob: torch.tensor):
-    unif = torch.rand(1)
+    unif = torch.rand(1).to(PreComputed.device)
     cond = unif>prob
     return min(cond.sum(),len(prob)-1)
 
@@ -14,8 +15,8 @@ def draw_index(meas: torch.Tensor,
                s2: torch.Tensor,
                Sigma_U_inv: torch.Tensor,
                Det_Sigma_U: torch.Tensor):
-    prob = torch.zeros(len(dist))
-    new_inds = torch.zeros(len(meas))
+    prob = torch.zeros(len(dist)).to(PreComputed.device)
+    new_inds = torch.zeros(len(meas)).to(PreComputed.device)
     for i,u in enumerate(meas):
         for j, p in enumerate(dist):
             prob[j] = -0.5*torch.sum(torch.matmul(
@@ -41,8 +42,8 @@ def decimal_representation(x: torch.Tensor):
 
 def det(A: torch.Tensor):
     n = A.shape[0]
-    base = torch.zeros(n)
-    exp = torch.zeros(n)
+    base = torch.zeros(n).to(PreComputed.device)
+    exp = torch.zeros(n).to(PreComputed.device)
     eigvals = torch.linalg.eigvals(A).real
     for i, val in enumerate(eigvals):
         a, b = decimal_representation(val)

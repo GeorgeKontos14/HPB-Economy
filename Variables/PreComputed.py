@@ -1,7 +1,14 @@
+import torch
+
 """
 Variables that are consistent throughout every run and
 are computed deterministically
 """
+
+if torch.cuda.is_available():
+    device = torch.device("cuda:0")
+else:
+    device = torch.device("cpu")
 
 Deltavar = 0.01**2
 Delta = None

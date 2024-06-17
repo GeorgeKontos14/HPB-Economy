@@ -8,8 +8,8 @@ def step1(Chol_Sigma_U: torch.Tensor,
           SuAAS: torch.Tensor,
           weights: torch.Tensor,
           Delta: torch.Tensor): # Draw X, C
-    fhat = torch.zeros(q+1)
-    sVs = torch.zeros((q+1,q+1))
+    fhat = torch.zeros(q+1).to(PreComputed.device)
+    sVs = torch.zeros((q+1,q+1)).to(PreComputed.device)
 
     s2 = (1-State.lambda_c**2)*State.kappa_c2*State.omega2
     for ind, i in enumerate(State.J):
@@ -34,8 +34,8 @@ def step1(Chol_Sigma_U: torch.Tensor,
         State.X[i] = State.C[i]-State.F
 
 def step2(Sigma_U_inv: torch.Tensor): # G
-    V_g = torch.zeros((25,q+1,q+1))
-    ms = torch.zeros((25,q+1))
+    V_g = torch.zeros((25,q+1,q+1)).to(PreComputed.device)
+    ms = torch.zeros((25,q+1)).to(PreComputed.device)
 
     s2 = (1-State.lambda_g**2)*State.kappa_g2*State.omega2
     for i,k in enumerate(State.K):
@@ -57,8 +57,8 @@ def step2(Sigma_U_inv: torch.Tensor): # G
                                    g)+torch.matmul(inv_V, ms[i])
 
 def step3(Sigma_U_inv): # H
-    V_h = torch.zeros((10,q+1,q+1))
-    ms = torch.zeros((10,q+1))
+    V_h = torch.zeros((10,q+1,q+1)).to(PreComputed.device)
+    ms = torch.zeros((10,q+1)).to(PreComputed.device)
 
     s2 = State.kappa_h2*State.omega2
     for k in range(10):
@@ -79,7 +79,7 @@ def step3(Sigma_U_inv): # H
         
 def step4(Sigma_U_inv: torch.Tensor,
           lambda_grid: torch.Tensor): # lambda_c
-    prob = torch.zeros(len(lambda_grid))
+    prob = torch.zeros(len(lambda_grid)).to(PreComputed.device)
     for ind, i in enumerate(State.J):
         s2 = (1-lambda_grid**2)*State.kappa_c2[ind]*State.omega2
         for l, lam in enumerate(lambda_grid):
@@ -97,7 +97,7 @@ def step4(Sigma_U_inv: torch.Tensor,
 
 def step5(Sigma_U_inv: torch.Tensor,
            lambda_grid: torch.Tensor): # lambda_g
-    prob = torch.zeros(len(lambda_grid))
+    prob = torch.zeros(len(lambda_grid)).to(PreComputed.device)
     for i,k in enumerate(State.K):
         s2 = (1-lambda_grid**2)*State.kappa_g2[i]*State.omega2
         for l, lam in enumerate(lambda_grid):
@@ -114,28 +114,28 @@ def step5(Sigma_U_inv: torch.Tensor,
 
 def step6(lambda_grid: torch.Tensor): # p_c_lambda
     no_lambdas = len(lambda_grid)
-    a = torch.ones(no_lambdas)*20/no_lambdas
+    a = torch.ones(no_lambdas).to(PreComputed.device)*20/no_lambdas
     for i in range(n):
         j = torch.round((no_lambdas-1)*State.lambda_c[i]/torch.max(lambda_grid)).int()
         a[j] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_c_lambda = prob/prob.sum()
 
 def step7(lambda_grid: torch.Tensor): # p_g_lambda
     no_lambdas = len(lambda_grid)
-    a = torch.ones(no_lambdas)*20/no_lambdas
+    a = torch.ones(no_lambdas).to(PreComputed.device)*20/no_lambdas
     for i in range(25):
         j = torch.round((no_lambdas-1)*State.lambda_g[i]/torch.max(lambda_grid)).int()
         a[j] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_g_lambda = prob/prob.sum()
 
 def step8(Sigma_U_inv: torch.Tensor,
           kappa_grid: torch.Tensor): # kappa_c
-    prob = torch.zeros(len(kappa_grid))
-    pbase = torch.zeros(len(kappa_grid))
+    prob = torch.zeros(len(kappa_grid)).to(PreComputed.device)
+    pbase = torch.zeros(len(kappa_grid)).to(PreComputed.device)
     for l, kappa in enumerate(kappa_grid):
         pbase[l] = -0.5*(q+1)*torch.log(kappa)+torch.log(State.p_c_kappa[l])
     
@@ -155,8 +155,8 @@ def step8(Sigma_U_inv: torch.Tensor,
         
 def step9(Sigma_U_inv: torch.Tensor,
           kappa_grid: torch.Tensor): # kappa_g
-    prob = torch.zeros(len(kappa_grid))
-    pbase = torch.zeros(len(kappa_grid))
+    prob = torch.zeros(len(kappa_grid)).to(PreComputed.device)
+    pbase = torch.zeros(len(kappa_grid)).to(PreComputed.device)
     for l, kappa in enumerate(kappa_grid):
         pbase[l] = -0.5*(q+1)*torch.log(kappa)+torch.log(State.p_g_kappa[l])
     
@@ -175,8 +175,8 @@ def step9(Sigma_U_inv: torch.Tensor,
 
 def step10(Sigma_U_inv: torch.Tensor,
           kappa_grid: torch.Tensor): # kappa_h
-    prob = torch.zeros(len(kappa_grid))
-    pbase = torch.zeros(len(kappa_grid))
+    prob = torch.zeros(len(kappa_grid)).to(PreComputed.device)
+    pbase = torch.zeros(len(kappa_grid)).to(PreComputed.device)
     for l, kappa in enumerate(kappa_grid):
         pbase[l] = -0.5*(q+1)*torch.log(kappa)+torch.log(State.p_h_kappa[l])
     
@@ -194,39 +194,39 @@ def step10(Sigma_U_inv: torch.Tensor,
 
 def step11(kappa_grid: torch.Tensor): # p_c_kappa
     no_kappas = len(kappa_grid)
-    a = torch.ones(no_kappas)*20/no_kappas
+    a = torch.ones(no_kappas).to(PreComputed.device)*20/no_kappas
     for kappa in State.kappa_c2:
         cond = kappa >= kappa_grid
         ind = cond.sum()
         a[ind] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_c_kappa = prob/prob.sum()
 
 def step12(kappa_grid: torch.Tensor): # p_g_kappa
     no_kappas = len(kappa_grid)
-    a = torch.ones(no_kappas)*20/no_kappas
+    a = torch.ones(no_kappas).to(PreComputed.device)*20/no_kappas
     for kappa in State.kappa_g2:
         cond = kappa >= kappa_grid
         ind = cond.sum()
         a[ind] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_g_kappa = prob/prob.sum()
 
 def step13(kappa_grid: torch.Tensor): # p_h_kappa
     no_kappas = len(kappa_grid)
-    a = torch.ones(no_kappas)*20/no_kappas
+    a = torch.ones(no_kappas).to(PreComputed.device)*20/no_kappas
     for kappa in State.kappa_h2:
         cond = kappa >= kappa_grid
         ind = cond.sum()
         a[ind] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_h_kappa = prob/prob.sum()
 
 def step14(Sigma_U_inv: torch.Tensor): # K
-    prob = torch.zeros(10)
+    prob = torch.zeros(10).to(PreComputed.device)
     s2 = (1-State.lambda_g**2)*State.kappa_g2*State.omega2
     for i,v in enumerate(State.G):
         for k,h in enumerate(State.H):
@@ -240,7 +240,7 @@ def step14(Sigma_U_inv: torch.Tensor): # K
         State.K[i] = ComputingUtils.draw_proportional(prob)
 
 def step15(Sigma_U_inv: torch.Tensor): # J
-    prob = torch.zeros(25)
+    prob = torch.zeros(25).to(PreComputed.device)
     s2 = (1-State.lambda_c**2)*State.kappa_c2*State.omega2
     for ind in range(n):
         v = State.C[ind]
@@ -257,7 +257,7 @@ def step15(Sigma_U_inv: torch.Tensor): # J
 
 def step16(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_c
-    meas = torch.zeros((n,q+1))
+    meas = torch.zeros((n,q+1)).to(PreComputed.device)
     s2 = (1-State.lambda_c**2)*State.kappa_c2*State.omega2
     for ind,i in enumerate(State.J):
         meas[ind] = State.C[ind]-State.lambda_c[ind]*State.G[i]
@@ -266,7 +266,7 @@ def step16(Sigma_U_inv: torch.Tensor,
 
 def step17(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_g
-    meas = torch.zeros((25,q+1))
+    meas = torch.zeros((25,q+1)).to(PreComputed.device)
     s2 = (1-State.lambda_g**2)*State.kappa_g2*State.omega2
     for i,k in enumerate(State.K):
         meas[i] = State.G[i]-State.lambda_g[i]*State.H[k]
@@ -274,41 +274,41 @@ def step17(Sigma_U_inv: torch.Tensor,
 
 def step18(Sigma_U_inv: torch.Tensor,
            Det_Sigma_U: torch.Tensor): # ind_theta_h
-    meas = torch.zeros((10,q+1))
+    meas = torch.zeros((10,q+1)).to(PreComputed.device)
     s2 = State.kappa_h2*State.omega2
     for i,h in enumerate(State.H):
         meas[i] = h
     State.ind_theta_h = ComputingUtils.draw_index(meas, State.p_h_theta, s2, Sigma_U_inv, Det_Sigma_U)
 
 def step19(no_thetas: int): # p_c_theta
-    a = torch.ones(no_thetas)*20/no_thetas
+    a = torch.ones(no_thetas).to(PreComputed.device)*20/no_thetas
     for x in State.ind_theta_c:
         a[x] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_c_theta = prob/prob.sum()
 
 def step20(no_thetas: int): # p_g_theta
-    a = torch.ones(no_thetas)*20/no_thetas
+    a = torch.ones(no_thetas).to(PreComputed.device)*20/no_thetas
     for x in State.ind_theta_g:
         a[x] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_g_theta = prob/prob.sum()
 
 def step21(no_thetas: int): # p_h_theta
-    a = torch.ones(no_thetas)*20/no_thetas
+    a = torch.ones(no_thetas).to(PreComputed.device)*20/no_thetas
     for x in State.ind_theta_h:
         a[x] += 1
     dist = torch.distributions.Chi2(a)
-    prob = dist.sample()
+    prob = dist.sample().to(PreComputed.device)
     State.p_h_theta = prob/prob.sum()
 
 def step22(Sigma_U_inv: torch.Tensor): # mu_c
     m = 0
     prec = 0
     s2 = State.omega2*(1-State.lambda_c**2)*State.kappa_c2
-    i_1 = torch.zeros(q+1)
+    i_1 = torch.zeros(q+1).to(PreComputed.device)
     i_1[0] = 1
     for ind, i in enumerate(State.J):
         u = State.C[ind]-State.lambda_c[ind]*State.G[i]
@@ -341,7 +341,7 @@ def step23(Sigma_U_inv: torch.Tensor):
             h.t(), Sigma_U_inv[State.ind_theta_h[k]], h])/s2[k]
         snu += q+1
     dist = torch.distributions.Chi2(snu)
-    v = dist.sample()
+    v = dist.sample().to(PreComputed.device)
     State.omega2 = ssum/v
 
 def step24(Sigma_m: torch.Tensor,
@@ -362,8 +362,8 @@ def step25(Sigma_m: torch.Tensor,
            Sigma_U_inv: torch.Tensor,
            weights: torch.Tensor,
            Deltainv: torch.Tensor):
-    m = torch.zeros(q+1)
-    fhat = torch.zeros(q+1)
+    m = torch.zeros(q+1).to(PreComputed.device)
+    fhat = torch.zeros(q+1).to(PreComputed.device)
     Sigma_F = State.sigma_m2*Sigma_m[State.ind_rho]+State.sigma_Da2*Sigma_A
 
     s2 = State.omega2*State.kappa_c2*(1-State.lambda_c**2)
@@ -405,7 +405,7 @@ def step27(sigma_grid: torch.Tensor,
            Sigma_m_inv: torch.Tensor,
            Sigma_A_inv: torch.Tensor):
     no_sigmas = len(sigma_grid)
-    prob = torch.zeros(no_sigmas)
+    prob = torch.zeros(no_sigmas).to(PreComputed.device)
     usu = torch.linalg.multi_dot(
         [State.S_m.t(), Sigma_m_inv[State.ind_rho], State.S_m])
     for l, sigma in enumerate(sigma_grid):
@@ -438,7 +438,7 @@ def step28(Sigma_m_inv: torch.Tensor,
            rho_grid: torch.Tensor): #ind_rho
     no_rhos = len(rho_grid)
     u = State.S_m
-    prob = torch.zeros(no_rhos)
+    prob = torch.zeros(no_rhos).to(PreComputed.device)
     for i in range(no_rhos):
         expon = -0.5/State.sigma_m2*torch.linalg.multi_dot(
             [u.t(),Sigma_m_inv[i], u])+Det_Sigma_m[i]
