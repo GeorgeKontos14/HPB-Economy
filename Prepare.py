@@ -235,9 +235,9 @@ def setRegionwA(r: Region,
     r.w = getlfweights(notnans, V, cutoff, Xraw)
     r.qi = r.w.shape[1]-1
     AB = torch.zeros((q+1, q+1)).to(PreComputed.device)
-    R_n = R[:T, :(q+1)].numpy()
+    R_n = R[:T, :(q+1)].cpu().numpy()
     for i in range(r.qi+1):
-        w_n = r.w[:,i].numpy()
+        w_n = r.w[:,i].cpu().numpy()
         model = sm.OLS(w_n, R_n, hasconst=False)
         results = model.fit()
         AB[i,:] = torch.tensor(results.params).float().to(PreComputed.device)
