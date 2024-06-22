@@ -55,3 +55,8 @@ def det(A: torch.Tensor):
     base = base_a
     exp += base_b
     return base, exp
+
+def OLS(X: torch.Tensor, Y: torch.Tensor):
+    xtx_inv = torch.linalg.inv(torch.matmul(X.t(), X))
+    xty = torch.matmul(X.t(), Y)
+    return torch.matmul(xtx_inv, xty)

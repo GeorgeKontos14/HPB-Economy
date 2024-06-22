@@ -9,8 +9,8 @@ import Utils.FileUtils as FileUtils
 pop_path = 'Data/pop_raw.csv'
 yp_path = 'Data/yp_raw.csv'
 theta_path = 'Results/Thetas/theta.csv'
-burn_in = 25
-total_draws = 200
+burn_in = 10
+total_draws = 100
 save=True
 
 def main():
@@ -18,7 +18,7 @@ def main():
         Store.clear_files()
     start = time.time()
     # Prepare data
-    theta = precompute(pop_path, yp_path)
+    theta, R = precompute(pop_path, yp_path)
     end = time.time()
     print(f"Preparations: {end-start}")
     FileUtils.write_mat(theta, theta_path)

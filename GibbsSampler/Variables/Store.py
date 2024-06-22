@@ -82,7 +82,8 @@ paths = {
 
 def clear_files():
     for path in paths.values():
-        FileUtils.clear_csv(path)
+        FileUtils.clear_csv(path[0])
+    FileUtils.clear_csv('Results/Thetas/theta.csv')
 
 def write():
     for var, path in paths.items():

@@ -1,9 +1,9 @@
 import torch
-import statsmodels.api as sm
 import csv
 import Variables.State as State
 import Variables.PreComputed as PreComputed
 import Utils.ComputingUtils as ComputingUtils
+import statsmodels.api as sm
 
 T: int = 118 # Minimum number of years for a country
 maxh: int = 100 # Offset between minimum and maximum number of years
@@ -25,18 +25,17 @@ def grids(no_kappas: int=25,
           no_rhos: int=25,
           no_sigmas: int = 25):
     kappa_grid = torch.tensor([
-        1/3*3**(2*i/(no_kappas-1)) for i in range(no_kappas)
+        (1/3)*3**(2*i/(no_kappas-1)) for i in range(no_kappas)
     ]).to(PreComputed.device)
-    lambda_grid = torch.tensor([
-        0.95*i/(no_lambdas-1) for i in range(no_lambdas)
+    lambda_grid = 0.95*torch.tensor([
+        i/(no_lambdas-1) for i in range(no_lambdas)
     ]).to(PreComputed.device)
-    rho_grid = torch.tensor([
-        0.5**(1/(50+i)*100/24) for i in range(no_rhos)
-    ]).to(PreComputed.device)
-    
-    sigma_grid = torch.tensor([
-        0.01*(0.1+1.9*i/(no_sigmas-1)) for i in range(no_sigmas)
-    ]).to(PreComputed.device)
+    rho_grid = 0.5**(1/torch.tensor([
+        50+i*100/(no_rhos-1) for i in range(no_rhos)
+    ]).to(PreComputed.device))
+    sigma_grid = (0.01*torch.tensor([
+        0.1+1.9*i/(no_sigmas-1) for i in range(no_sigmas)
+    ]).to(PreComputed.device))**2
     return kappa_grid, lambda_grid, rho_grid, sigma_grid
 
 def largest_eigenvecs(A: torch.Tensor, no_Vecs:int):
@@ -46,98 +45,86 @@ def largest_eigenvecs(A: torch.Tensor, no_Vecs:int):
 
 def baseline_trend(Deltavar: float = 0.01**2):
     Xraw = torch.zeros((T,2)).to(PreComputed.device)
-    Xrawfcst = torch.zeros((Tmax-T+1, 2)).to(PreComputed.device)
-    V = torch.zeros((T,T)).to(PreComputed.device)
-    Xraw[:,0] = 1/T
-    Xrawfcst[:,0] = 1/T
-    Xraw[:,1] = torch.tensor([i/T for i in range(1,T+1)])
-    Xrawfcst[:,1] = torch.tensor([i/T for i in range(T,Tmax+1)])
-    Xrawfcst[:,1] = Xrawfcst[:,1]-torch.sum(Xrawfcst[:,1])/T
-    Xraw[:,1] = Xraw[:,1]-torch.sum(Xraw[:,1])/T
-    Xrawfcst = torch.matmul(Xrawfcst, 
-                            torch.linalg.inv(torch.matmul(Xraw.t(), Xraw)))
-    
-    for i in range(T):
-        for j in range(T):
-            V[i][j] = min(i+1,j+1)
-    M = torch.eye(T).to(PreComputed.device)-torch.linalg.multi_dot([
-        Xraw, torch.linalg.inv(torch.matmul(Xraw.t(), Xraw)), Xraw.t()])
-    evals, evecs = largest_eigenvecs(torch.linalg.multi_dot([M, V, M]), q-1)
-    cutoff = 0.9999*evals[q0-1]
-    R = torch.zeros((Tmax, q+101)).to(PreComputed.device)
+    Xrawfcst = torch.zeros((Tmax-T+1,2)).to(PreComputed.device)
+    Fw = torch.zeros((Tmax, q+101)).to(PreComputed.device)
     Xfcstf = torch.zeros((100,2)).to(PreComputed.device)
-    R[:T,:2] = Xraw
-    R[:T,2:(q+1)] = evecs
-    R[T-1, (q+1):] = -1
+    Deltavar = 0.01**2
+
+    Xraw[:, 0] = 1/T
+    Xrawfcst[:, 0] = 1/T
+    Xraw[:, 1] = torch.tensor([i/T for i in range(1, T+1)]).to(PreComputed.device)
+    Xrawfcst[:, 1] = torch.tensor([i/T for i in range(T, Tmax+1)]).to(PreComputed.device)
+    Xrawfcst[:, 1] -= torch.sum(Xrawfcst[:, 1])/T
+    Xraw[:, 1] -= torch.sum(Xraw[:,1])/T
+    Xrawfcst= torch.matmul(Xrawfcst, torch.linalg.inv(torch.matmul(Xraw.t(), Xraw)))
+    rows = torch.arange(1,T+1).unsqueeze(1)
+    cols = torch.arange(1,T+1).unsqueeze(0)
+    SRW = torch.min(rows, cols).float().to(PreComputed.device)
+    m = torch.eye(T).to(PreComputed.device)-torch.linalg.multi_dot([Xraw, torch.linalg.inv(torch.matmul(Xraw.t(), Xraw)), Xraw.t()])
+    evals, evecs = largest_eigenvecs(torch.linalg.multi_dot([m, SRW, m]), q-1)
+    cutoff = 0.9999*evals[q0-2]
+    Fw[:T, :2] = Xraw
+    Fw[:T, 2:(q+1)] = evecs
+    Fw[T-1, (q+1):] = -1
     for s in range(100):
-        R[T+s, q+1+s] = 1
-        Xfcstf = Xrawfcst[s+1,:] - Xrawfcst[0, :]
-
-    Delta = Deltavar*torch.matmul(R[:T, :q+1].t(), R[:T, :q+1])
+        Fw[T+s, q+s+1] = 1
+        Xfcstf[s,:] = Xrawfcst[s+1,:] - Xrawfcst[0,:]
+    Fw_ = Fw[:T, :(q+1)]
+    Delta = Deltavar*torch.matmul(Fw_.t(), Fw_)
     Deltainv = torch.linalg.inv(Delta)
-
-    G = torch.matmul(R[:T,:(q+1)], torch.linalg.inv(torch.matmul(R[:T,:(q+1)].t(), R[:T,:(q+1)])))
-    return Xraw, R, Delta, Deltainv, Xfcstf, cutoff, G, V
+    G = torch.matmul(Fw_, torch.linalg.inv(torch.matmul(Fw_.t(), Fw_)))
+    return Xraw, Fw, Delta, Deltainv, Xfcstf, cutoff, G, SRW
 
 def Sigma_M(rho_grid: torch.Tensor, R: torch.Tensor):
+    rho_grid = PreComputed.rho_grid
     no_rhos = len(rho_grid)
-
+    ssv = torch.zeros(Tmax).to(PreComputed.device)
+    sfmss = torch.zeros(25).to(PreComputed.device).unsqueeze(1)
     Sigma_m = torch.zeros((no_rhos, q+1, q+1)).to(PreComputed.device)
     Sigma_m_inv = torch.zeros((no_rhos, q+1, q+1)).to(PreComputed.device)
     Chol_Sigma_m = torch.zeros((no_rhos, q+1, q+1)).to(PreComputed.device)
     Det_Sigma_m = torch.zeros((no_rhos, 2)).to(PreComputed.device)
-    mfcstfm = torch.zeros(100,q+1,25).to(PreComputed.device)
-    cholfcstfm = torch.zeros((100,100,25)).to(PreComputed.device)
-    ssv = torch.ones(Tmax).to(PreComputed.device)*(-1)
-    ssh=torch.tensor([50]).to(PreComputed.device)
-    ssv[ssh+1]=1
-    A = torch.zeros((Tmax, Tmax)).to(PreComputed.device)
+    mfcstfm = torch.zeros((no_rhos, 100, q+1)).to(PreComputed.device)
+    cholfcstfm = torch.zeros((no_rhos, 100, 100)).to(PreComputed.device)
 
-    for j in range(Tmax):
-        for i in range(Tmax):
-            A[i][j] = i>=j
-
-    Sraw = torch.zeros((Tmax, Tmax)).to(PreComputed.device)
-    exps = torch.zeros((Tmax, Tmax)).to(PreComputed.device)
-    for s1 in range(Tmax):
-        for s2 in range(Tmax):
-            exps[s1][s2] = abs(s1-s2)
-
+    ssv[0] = -1
+    ssv[51] = 1
+    rows = torch.arange(1, Tmax+1).unsqueeze(1)
+    cols = torch.arange(1, Tmax+1).unsqueeze(0)
+    A = (rows>=cols).float().to(PreComputed.device)
+    exps = torch.abs(rows-cols).to(PreComputed.device)
     for i, rho in enumerate(rho_grid):
         Sraw = rho**exps
         Sraw = torch.linalg.multi_dot([A, Sraw, A.t()])
+        sfmss[i] = torch.linalg.multi_dot([ssv.t(), Sraw, ssv])
         Sall = torch.linalg.multi_dot([R.t(), Sraw, R])
         S = Sall[:(q+1), :(q+1)]
-        m, e = ComputingUtils.det(S)
-        Det_Sigma_m[i][0] = m
-        Det_Sigma_m[i][1] = e
         Sigma_m[i] = S
         Sigma_m_inv[i] = torch.linalg.inv(S)
+        m,e = ComputingUtils.det(S)
+        Det_Sigma_m[i,0] = m
+        Det_Sigma_m[i,1] = e
         Chol_Sigma_m[i] = torch.linalg.cholesky(S)
-        mfcstfm[:,:,i] = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_m_inv[i,:,:])
-        cholfcstfm[:,:,i] = torch.linalg.cholesky(Sall[(q+1):, (q+1):]-torch.matmul(
-            mfcstfm[:,:,i], Sall[:(q+1),(q+1):]))
-
+        mfcstfm[i] = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_m_inv[i])
+        cholfcstfm[i] = Sall[(q+1):,(q+1):]-torch.matmul(mfcstfm[i], Sall[:(q+1),(q+1):])
     Det_Sigma_m[:, 0] = torch.log(torch.abs(Det_Sigma_m[:,0]))
     Det_Sigma_m[:, 1] = Det_Sigma_m[:, 1]*torch.log(torch.tensor(10))
     Det_Sigma_m = -0.5*Det_Sigma_m[:, 0]-0.5*Det_Sigma_m[:, 1]
-    return Sigma_m, Sigma_m_inv, Det_Sigma_m, Chol_Sigma_m, mfcstfm, cholfcstfm, ssv, ssh
+    return Sigma_m, Sigma_m_inv, Det_Sigma_m, Chol_Sigma_m, mfcstfm, cholfcstfm, ssv, torch.tensor(50).to(PreComputed.device)
 
-def Sigma_a(R: torch.Tensor):
-    A = torch.zeros((Tmax, Tmax)).to(PreComputed.device)
-
-    for j in range(Tmax):
-        for i in range(Tmax):
-            A[i][j] = i>=j
-
+def Sigma_a(R: torch.Tensor, ssv: torch.Tensor):
+    rows = torch.arange(1, Tmax+1).unsqueeze(1)
+    cols = torch.arange(1, Tmax+1).unsqueeze(0)
+    A = (rows>=cols).float().to(PreComputed.device)
     Sraw = torch.matmul(A, A.t())
-    Sall = torch.linalg.multi_dot([R.t(), Sraw, R])
-    Sigma_A = Sall[:(q+1),:(q+1)]
-    Chol_Sigma_A = torch.linalg.cholesky(Sigma_A)
-    Sigma_A_inv = torch.linalg.inv(Sigma_A)
-    mfcstfa = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_A_inv)
-    cholfcstfa=torch.linalg.cholesky(Sall[(q+1):, (q+1):]-torch.matmul(
-        mfcstfa, Sall[:(q+1),(q+1):]))
+    sfass = torch.linalg.multi_dot([ssv.t(), Sraw, ssv])
+    Sall = torch.linalg.multi_dot([R.t(),Sraw, R])
+    S = Sall[:(q+1), :(q+1)]
+    Sigma_A = S
+    Chol_Sigma_A = torch.linalg.cholesky(S)
+    Sigma_A_inv = torch.linalg.inv(S)
+    mfcstfa = torch.matmul(Sall[(q+1):,:(q+1)], Sigma_A_inv)
+    cholfcstfa = torch.linalg.cholesky(Sall[(q+1):, (q+1):]-torch.matmul(mfcstfa, Sall[:(q+1), (q+1):]))
 
     return Sigma_A, Sigma_A_inv, Chol_Sigma_A, mfcstfa, cholfcstfa
 
@@ -171,34 +158,35 @@ def setSfromga(ga):
         S[:,k] = gax[(Tmax-1-k):(2*Tmax-1-k)]
     return S
 
-def Sigma_Us(gammas: torch.Tensor, R: torch.Tensor, no_thetas: int=100):
+def Sigma_Us(gammas: torch.Tensor, R: torch.Tensor, ssv: torch.Tensor, no_thetas: int=100):
     Sigma_U = torch.zeros((no_thetas, q+1, q+1)).to(PreComputed.device)
     Sigma_U_inv = torch.zeros((no_thetas, q+1, q+1)).to(PreComputed.device)
     Chol_Sigma_U = torch.zeros((no_thetas, q+1, q+1)).to(PreComputed.device)
     Det_Sigma_U = torch.zeros((no_thetas, 2)).to(PreComputed.device)
-    mfcstu = torch.zeros((100,q+1,100)).to(PreComputed.device)
+    mfcstu = torch.zeros((100, q+1, 100)).to(PreComputed.device)
+    sfcstu = torch.zeros((100, 100, 100)).to(PreComputed.device)
     cholfcstu = torch.zeros((100,100,100)).to(PreComputed.device)
-    Sfcstu = torch.zeros((100,100,100)).to(PreComputed.device)
+    suss = torch.zeros(100).to(PreComputed.device).unsqueeze(1)
 
-    for i in range(no_thetas):
-        Sraw = setSfromga(gammas[:,i])
+    for i in range(100):
+        Sraw = setSfromga(gammas[:, i])
         Sall = torch.linalg.multi_dot([R.t(), Sraw, R])
         S = Sall[:(q+1),:(q+1)]
-        Sigma_U[i,:,:] = S
+        Sigma_U[i] = S
         m, e = ComputingUtils.det(S)
-        Det_Sigma_U[i][0] = m
-        Det_Sigma_U[i][1] = e
-        Chol_Sigma_U[i,:,:] = torch.linalg.cholesky(S)
-        Sigma_U_inv[i,:,:] = torch.linalg.inv(S)
-        mfcstu[:,:,i] = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_U_inv[i,:,:])
-        Sfcstu[:,:,i] = Sall[(q+1):, (q+1):] - torch.matmul(
-            mfcstu[:,:,i],Sall[:(q+1), (q+1):])
-        cholfcstu[:,:,i] = torch.linalg.cholesky(Sfcstu[:,:,i])
+        Det_Sigma_U[i,0] = m
+        Det_Sigma_U[i,1] = e
+        Chol_Sigma_U[i] = torch.linalg.cholesky(S)
+        Sigma_U_inv[i] = torch.linalg.inv(S)
+        mfcstu[:,:,i] = torch.matmul(Sall[(q+1):, :(q+1)], Sigma_U_inv[i])
+        sfcstu[:,:,i] = Sall[(q+1):,(q+1):]-torch.matmul(mfcstu[:,:,i], Sall[:(q+1),(q+1):])
+        cholfcstu[:,:,i] = torch.linalg.cholesky(sfcstu[:,:,i])
+        suss[i] = torch.linalg.multi_dot([ssv.t(),Sraw,ssv])
 
     Det_Sigma_U[:, 0] = torch.log(torch.abs(Det_Sigma_U[:,0]))
-    Det_Sigma_U[:, 1] = Det_Sigma_U[:, 1]*torch.log(torch.tensor(10))
+    Det_Sigma_U[:, 1] = Det_Sigma_U[:, 1]*torch.log(torch.tensor(10).to(PreComputed.device))
     Det_Sigma_U = -0.5*Det_Sigma_U[:, 0]-0.5*Det_Sigma_U[:, 1]
-    return Sigma_U, Sigma_U_inv, Chol_Sigma_U, Det_Sigma_U, mfcstu, cholfcstu, Sfcstu
+    return Sigma_U, Sigma_U_inv, Chol_Sigma_U, Det_Sigma_U, mfcstu, cholfcstu, sfcstu
 
 def getlfweights(sel: torch.Tensor, 
                  V: torch.Tensor, 
@@ -235,12 +223,13 @@ def setRegionwA(r: Region,
     r.w = getlfweights(notnans, V, cutoff, Xraw)
     r.qi = r.w.shape[1]-1
     AB = torch.zeros((q+1, q+1)).to(PreComputed.device)
-    R_n = R[:T, :(q+1)].cpu().numpy()
+    R_n = R[:T, :(q+1)].numpy()
     for i in range(r.qi+1):
-        w_n = r.w[:,i].cpu().numpy()
-        model = sm.OLS(w_n, R_n, hasconst=False)
+        w_n = r.w[:,i].numpy()
+        model = sm.OLS(w_n,R_n)
         results = model.fit()
-        AB[i,:] = torch.tensor(results.params).float().to(PreComputed.device)
+        params = torch.tensor(results.params)
+        AB[i,:] = params.to(PreComputed.device)
     AB[(r.qi+2):, :] = 0
     for i in range(r.qi+1, q+1):
         AB[i][i] = 1
@@ -291,7 +280,7 @@ def loadRegions(no_thetas: int,
     State.mu_m = F[1]
     for i, r in enumerate(regions):
         setRegionwA(r, i, ~torch.isnan(leveldata[:,i]), V, cutoff, Xraw, R, Sigma_U, SuAA, SuAAS)
-        filtered = torch.where(~torch.isnan(leveldata[:,i]), leveldata[:,i], torch.tensor(1))
+        filtered = torch.where(~torch.isnan(leveldata[:,i]), leveldata[:,i], torch.tensor(1).to(PreComputed.device))
         r.Y = torch.matmul(r.w.t(), torch.log(filtered))
     
     return regions, F, SuAA, SuAAS, weights
@@ -310,14 +299,14 @@ def precompute(pop_path: str,
     PreComputed.Sigma_m, PreComputed.Sigma_m_inv, PreComputed.Det_Sigma_m, Chol_Sigma_m, mfcstfm, cholfcstfm, ssv, ssh = Sigma_M(
         PreComputed.rho_grid, R)
     
-    PreComputed.Sigma_A, PreComputed.Sigma_A_inv, Chol_Sigma_A, mfcstfa, cholfcstfa = Sigma_a(R)
+    PreComputed.Sigma_A, PreComputed.Sigma_A_inv, Chol_Sigma_A, mfcstfa, cholfcstfa = Sigma_a(R, ssv)
 
     gammas, half_life_dist, theta = thetas(PreComputed.no_thetas)
 
     Sigma_U, PreComputed.Sigma_U_inv, PreComputed.Chol_Sigma_U, PreComputed.Det_Sigma_U,  mfcstu, cholfcstu, Sfcstu = Sigma_Us(
-        gammas,R,PreComputed.no_thetas)
+        gammas,R, ssv,PreComputed.no_thetas)
     
     PreComputed.regions, F, PreComputed.SuAA, PreComputed.SuAAS, PreComputed.weights = loadRegions(
         PreComputed.no_thetas, pop_path,yp_path,R,V,cutoff,Xraw,Sigma_U)
     
-    return theta.t()
+    return theta.t(), R

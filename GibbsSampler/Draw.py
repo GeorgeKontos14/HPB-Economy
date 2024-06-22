@@ -28,7 +28,7 @@ def initialize(regions: list[Region],
         State.C[i] = State.X[i]-State.F
     State.Y0 = torch.zeros(q+1).to(PreComputed.device)
 
-    State.sigma_m2 = 10**(-6)
+    State.sigma_m2 = PreComputed.sigma_grid[0]
     State.sigma_Da2 = 0.03**2/2.198
     State.ind_rho = 0
     State.mu_c = 0
@@ -55,12 +55,11 @@ def initialize(regions: list[Region],
         State.ind_theta_h[i] = int(i%100)
 
 def draw():
-    initialize(
-        PreComputed.regions, 
-        PreComputed.no_kappas, 
-        PreComputed.no_lambdas, 
-        PreComputed.no_thetas
-    )
+    step1(PreComputed.Chol_Sigma_U, 
+          PreComputed.SuAA,
+          PreComputed.SuAAS,
+          PreComputed.weights,
+          PreComputed.Delta)
 
     step2(PreComputed.Sigma_U_inv)
 
@@ -171,9 +170,14 @@ def store_draw():
     Store.ind_theta_g_draws.append(State.ind_theta_g)
     Store.ind_theta_h_draws.append(State.ind_theta_h)
 
-def sample(burn_in: int, total_draws: int):
-    for _ in range(burn_in):
+def sample(burn_in: int, total_draws: int, skips: int = 1):
+    Delta = PreComputed.Delta
+    for i in range(burn_in):
+        if i % 20 == 1:
+            PreComputed.Delta = Delta*1000**(max(0, (burn_in/2-i)/(0.5*burn_in)))
+            PreComputed.Deltainv = torch.linalg.inv(PreComputed.Delta)
         draw()
-    for _ in range(total_draws-burn_in):
+    for i in range(total_draws-burn_in):
         draw()
-        store_draw()
+        if i % skips == 0:
+            store_draw()

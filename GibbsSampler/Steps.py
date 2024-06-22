@@ -11,27 +11,45 @@ def step1(Chol_Sigma_U: torch.Tensor,
     fhat = torch.zeros(q+1).to(PreComputed.device)
     sVs = torch.zeros((q+1,q+1)).to(PreComputed.device)
 
-    s2 = (1-State.lambda_c**2)*State.kappa_c2*State.omega2
+    # s2 = (1-State.lambda_c**2)*State.kappa_c2*State.omega2
+    # for ind, i in enumerate(State.J):
+    #     mu_C = State.lambda_c[ind]*State.G[i]
+    #     mu_C[0] += State.mu_c
+    #     u = ComputingUtils.draw_standard_normal(q+1)
+    #     u = torch.sqrt(s2[ind])*torch.matmul(Chol_Sigma_U[State.ind_theta_c[ind]],
+    #                                           u)+mu_C
+    #     State.C[ind] = u - torch.matmul(SuAA[:,:,State.ind_theta_c[ind], ind],
+    #                                      u-State.C[ind])
+    #     if weights[ind] > 0:
+    #         fhat += weights[ind]*State.C[ind]
+    #         sVs += weights[ind]**2*s2[ind]*SuAAS[:,:,State.ind_theta_c[ind],ind]
+    
+    # e = ComputingUtils.draw_standard_normal(q+1)
+    # e = State.Y0+torch.matmul(torch.linalg.cholesky(Delta), e)
+    # fhat = torch.matmul(torch.linalg.inv(sVs+Delta), fhat-e)
+    
+    # for i,w in enumerate(weights):
+    #     if w > 0:
+    #         State.C[i] -= w*s2[i]*torch.matmul(SuAAS[:,:,State.ind_theta_c[i],i], fhat)
+    #     State.X[i] = State.C[i]+State.F
+    s2 = State.omega2*State.kappa_c2*(1-State.lambda_c**2)
     for ind, i in enumerate(State.J):
-        mu_C = State.lambda_c[ind]*State.G[i]
-        mu_C[0] += State.mu_c
+        m = State.lambda_c[ind]*State.G[i]
+        m[0] += State.mu_c
         u = ComputingUtils.draw_standard_normal(q+1)
-        u = torch.sqrt(s2[ind])*torch.matmul(Chol_Sigma_U[State.ind_theta_c[ind]],
-                                              u)+mu_C
-        State.C[ind] = u - torch.matmul(SuAA[:,:,State.ind_theta_c[ind], ind],
-                                         u-State.C[ind])
-        if weights[ind] > 0:
+        u = torch.sqrt(s2[ind])*torch.matmul(Chol_Sigma_U[State.ind_theta_c[ind]], u)+m
+        State.C[ind] = u-torch.matmul(SuAA[:,:,State.ind_theta_c[ind],ind], u-State.C[ind])
+        if weights[ind]>0:
             fhat += weights[ind]*State.C[ind]
-            sVs += weights[ind]**2*s2[ind]*SuAAS[:,:,State.ind_theta_c[ind],ind]
-    
+            sVs += weights[ind]**2*s2[ind]*SuAAS[:,:,State.ind_theta_c[ind], ind]
+
     e = ComputingUtils.draw_standard_normal(q+1)
-    e = State.Y0+torch.matmul(torch.linalg.cholesky(Delta), e)
+    e = State.Y0+torch.matmul(torch.linalg.cholesky(Delta),e)
     fhat = torch.matmul(torch.linalg.inv(sVs+Delta), fhat-e)
-    
-    for i,w in enumerate(weights):
-        if w > 0:
-            State.C[i] -= w*s2[i]*torch.matmul(SuAAS[:,:,State.ind_theta_c[i],i], fhat)
-        State.X[i] = State.C[i]-State.F
+    for ind in range(n):
+        if weights[ind] > 0:
+            State.C[ind] -= weights[ind]*s2[ind]*torch.matmul(SuAAS[:,:,State.ind_theta_c[ind], ind], fhat)
+        State.X[ind] = State.C[ind]+State.F
 
 def step2(Sigma_U_inv: torch.Tensor): # G
     V_g = torch.zeros((25,q+1,q+1)).to(PreComputed.device)
@@ -46,7 +64,7 @@ def step2(Sigma_U_inv: torch.Tensor): # G
     for ind, i in enumerate(State.J):
         u = State.C[ind]
         u[0] -= State.mu_c
-        V_g[i] += State.lambda_c[ind]*Sigma_U_inv[State.ind_theta_c[ind]]/s2[ind]
+        V_g[i] += State.lambda_c[ind]**2*Sigma_U_inv[State.ind_theta_c[ind]]/s2[ind]
         ms[i] += State.lambda_c[ind]*torch.matmul(
             Sigma_U_inv[State.ind_theta_c[ind]],u)/s2[ind]
     
@@ -67,7 +85,7 @@ def step3(Sigma_U_inv): # H
     s2 = (1-State.lambda_g**2)*State.kappa_g2*State.omega2
     for i,k in enumerate(State.K):
         u = State.G[i]
-        V_h[k] += State.lambda_g[i]*Sigma_U_inv[State.ind_theta_g[i]]/s2[i]
+        V_h[k] += State.lambda_g[i]**2*Sigma_U_inv[State.ind_theta_g[i]]/s2[i]
         ms[k] += State.lambda_g[i]*torch.matmul(
             Sigma_U_inv[State.ind_theta_g[i]],u)/s2[i]
         
@@ -312,20 +330,19 @@ def step22(Sigma_U_inv: torch.Tensor): # mu_c
     i_1[0] = 1
     for ind, i in enumerate(State.J):
         u = State.C[ind]-State.lambda_c[ind]*State.G[i]
-        m += torch.linalg.multi_dot(
-            [i_1.t(), Sigma_U_inv[State.ind_theta_c[ind]], u])/s2[ind]
-        prec += torch.linalg.multi_dot(
-            [i_1.t(), Sigma_U_inv[State.ind_theta_c[ind]], i_1])/s2[ind]
+        m += torch.sum(Sigma_U_inv[State.ind_theta_c[ind], :, 0]*u)/s2[ind]
+        prec += Sigma_U_inv[State.ind_theta_c[ind], 0, 0]/s2[ind]
     v = ComputingUtils.draw_standard_normal(1)
     v = m/prec+v/torch.sqrt(prec)
     State.mu_c = v[0]
 
-def step23(Sigma_U_inv: torch.Tensor):
+def step23(Sigma_U_inv: torch.Tensor): # omega2
     ssum = 1/2.198
     snu = 1
     s2 = State.kappa_c2*(1-State.lambda_c**2)
     for ind, i in enumerate(State.J):
         u = State.C[ind]-State.lambda_c[ind]*State.G[i]
+        u[0] -= State.mu_c
         ssum += torch.linalg.multi_dot(
             [u.t(), Sigma_U_inv[State.ind_theta_c[ind]], u])/s2[ind]
         snu += q+1
@@ -345,12 +362,13 @@ def step23(Sigma_U_inv: torch.Tensor):
     State.omega2 = ssum/v
 
 def step24(Sigma_m: torch.Tensor,
-           Sigma_A: torch.Tensor):
+           Sigma_A: torch.Tensor): # f0, mu_m
     Sigma_F = State.sigma_m2*Sigma_m[State.ind_rho]+State.sigma_Da2*Sigma_A
     Sigma_F_inv = torch.linalg.inv(Sigma_F)
 
     prec = Sigma_F_inv[:2,:2]
     m = torch.matmul(Sigma_F_inv[:2], State.F)
+    prec = torch.linalg.inv(prec)
     v = ComputingUtils.draw_standard_normal(2)
     v = torch.matmul(prec,m)+torch.matmul(
         torch.linalg.cholesky(prec), v)
@@ -361,29 +379,52 @@ def step25(Sigma_m: torch.Tensor,
            Sigma_A: torch.Tensor,
            Sigma_U_inv: torch.Tensor,
            weights: torch.Tensor,
-           Deltainv: torch.Tensor):
+           Deltainv: torch.Tensor): # F
     m = torch.zeros(q+1).to(PreComputed.device)
     fhat = torch.zeros(q+1).to(PreComputed.device)
-    Sigma_F = State.sigma_m2*Sigma_m[State.ind_rho]+State.sigma_Da2*Sigma_A
+    # Sigma_F = State.sigma_m2*Sigma_m[State.ind_rho]+State.sigma_Da2*Sigma_A
 
+    # s2 = State.omega2*State.kappa_c2*(1-State.lambda_c**2)
+    # for ind, i in enumerate(State.J):
+    #     u = State.X[ind] - State.lambda_c[ind]*State.G[i]
+    #     u[0] -= State.mu_c
+    #     u[0] -= State.f0
+    #     u[1] -= State.mu_m
+    #     m += torch.matmul(Sigma_U_inv[State.ind_theta_c[ind]], u)/s2[ind]
+    #     Sigma_F += Sigma_U_inv[State.ind_theta_c[ind]]/s2[ind]
+    #     if weights[ind] > 0:
+    #         fhat += weights[ind]*State.X[ind]
+    # Sigma_F_inv = torch.linalg.inv(Sigma_F)
+    # V_F = torch.linalg.inv(Sigma_F_inv+Deltainv)
+    # fhat[0] -= State.f0
+    # fhat[1] -= State.mu_m
+    # m += torch.matmul(Deltainv, fhat-State.Y0)
+    # v = ComputingUtils.draw_standard_normal(q+1)
+    # State.F = torch.matmul(V_F, m)+torch.matmul(
+    #     torch.linalg.cholesky(V_F), v)
+    # State.F[0] += State.f0
+    # State.F[1] += State.mu_m
+    # for ind in range(n):
+    #     State.C[ind] = State.X[ind]-State.F
+    Sigi = State.sigma_m2*Sigma_m[State.ind_rho]+State.sigma_Da2*Sigma_A
+    Sigi = torch.linalg.inv(Sigi)
     s2 = State.omega2*State.kappa_c2*(1-State.lambda_c**2)
     for ind, i in enumerate(State.J):
-        u = State.X[ind] - State.lambda_c[ind]*State.G[i]
+        u = State.X[ind]-State.lambda_c[ind]*State.G[i]
         u[0] -= State.mu_c
         u[0] -= State.f0
         u[1] -= State.mu_m
-        m += torch.matmul(Sigma_U_inv[State.ind_theta_c[ind]], u)/s2[ind]
-        Sigma_F += Sigma_U_inv[State.ind_theta_c[ind]]/s2[ind]
+        m += torch.matmul(Sigma_U_inv[State.ind_theta_c[ind]],u)/s2[ind]
+        Sigi += Sigma_U_inv[State.ind_theta_c[ind]]/s2[ind]
         if weights[ind] > 0:
             fhat += weights[ind]*State.X[ind]
-    Sigma_F_inv = torch.linalg.inv(Sigma_F)
-    V_F = torch.linalg.inv(Sigma_F_inv+Deltainv)
+    Sigi += Deltainv
     fhat[0] -= State.f0
     fhat[1] -= State.mu_m
     m += torch.matmul(Deltainv, fhat-State.Y0)
+    Sigi = torch.linalg.inv(Sigi)
     v = ComputingUtils.draw_standard_normal(q+1)
-    State.F = torch.matmul(V_F, m)+torch.matmul(
-        torch.linalg.cholesky(V_F), v)
+    State.F = torch.matmul(Sigi,m)+torch.matmul(torch.linalg.cholesky(Sigi),v)
     State.F[0] += State.f0
     State.F[1] += State.mu_m
     for ind in range(n):
@@ -391,19 +432,28 @@ def step25(Sigma_m: torch.Tensor,
 
 def step26(Sigma_m: torch.Tensor,
            Sigma_A: torch.Tensor): # S_m
-    Sig_m = State.sigma_m2*Sigma_m[State.ind_rho]
-    Sigma_S = Sig_m+State.sigma_Da2*Sigma_A
+    # Sig_m = State.sigma_m2*Sigma_m[State.ind_rho]
+    # Sigma_S = Sig_m+State.sigma_Da2*Sigma_A
+    # u = State.F
+    # u[0] -= State.f0
+    # u[1] -= State.mu_m
+    # mfm = torch.matmul(Sig_m, torch.linalg.inv(Sigma_S))
+    # v = ComputingUtils.draw_standard_normal(q+1)
+    # State.S_m = torch.matmul(mfm,u)+torch.matmul(
+    #     torch.linalg.cholesky(Sig_m-torch.matmul(mfm,Sig_m)), v)
+    S = State.sigma_m2*Sigma_m[State.ind_rho]
+    Sigi = S+State.sigma_Da2*Sigma_A
+    Sigi = torch.linalg.inv(Sigi)
     u = State.F
     u[0] -= State.f0
     u[1] -= State.mu_m
-    mfm = torch.matmul(Sig_m, torch.linalg.inv(Sigma_S))
+    mfm = torch.matmul(S, Sigi)
     v = ComputingUtils.draw_standard_normal(q+1)
-    State.S_m = torch.matmul(mfm,u)+torch.matmul(
-        torch.linalg.cholesky(Sig_m-torch.matmul(mfm,Sig_m)), v)
+    State.S_m = torch.matmul(mfm,u)+torch.matmul(torch.linalg.cholesky(S-torch.matmul(mfm,S)),v)
     
 def step27(sigma_grid: torch.Tensor,
            Sigma_m_inv: torch.Tensor,
-           Sigma_A_inv: torch.Tensor):
+           Sigma_A_inv: torch.Tensor): # sigma_m2, sigma_Da2
     no_sigmas = len(sigma_grid)
     prob = torch.zeros(no_sigmas).to(PreComputed.device)
     usu = torch.linalg.multi_dot(
@@ -412,13 +462,12 @@ def step27(sigma_grid: torch.Tensor,
         prob[l] = -0.5*usu/sigma-0.5*(q+1)*torch.log(sigma)
     prob = torch.exp(prob-torch.max(prob))
     for l in range(no_sigmas):
-        if 2*l <= no_sigmas:
-            prob[l] = prob[l]*l
+        if 2*(l+1) <= no_sigmas:
+            prob[l] = prob[l]*(l+1)
         else:
-            prob[l] = prob[l]*(no_sigmas+1-l)
+            prob[l] = prob[l]*(no_sigmas-l)
     for l in range(1, no_sigmas):
         prob[l] += prob[l-1]
-
     prob = prob/prob[-1]
     s_ind = ComputingUtils.draw_proportional(prob)
     State.sigma_m2 = sigma_grid[s_ind]
