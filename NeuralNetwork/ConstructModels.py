@@ -1,7 +1,7 @@
 from tensorflow.keras.models import Sequential # type: ignore
 from tensorflow.keras.layers import Dense, Input, SimpleRNN, LSTM, GRU, Bidirectional # type: ignore
 from tensorflow.keras.losses import mse # type: ignore
-from LearningInstance import LearningInstance
+from NeuralNetwork.LearningInstance import LearningInstance
 
 def construct_MLP(input_shape: tuple, 
                   layers: list[int], 

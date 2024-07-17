@@ -1,6 +1,6 @@
 import numpy as np
 import statsmodels.api as sm
-from LearningInstance import LearningInstance
+from NeuralNetwork.LearningInstance import LearningInstance
 
 def largest_eigenvecs(A: np.ndarray, n: int):
     """

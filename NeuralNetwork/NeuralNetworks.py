@@ -1,7 +1,7 @@
 import numpy as np
 from tensorflow.keras.models import Sequential # type: ignore
-from LearningInstance import LearningInstance
-from ConstructModels import construct_MLP, construct_RNN, construct_LSTM, construct_GRU, construct_BiNN
+from NeuralNetwork.LearningInstance import LearningInstance
+from NeuralNetwork.ConstructModels import construct_MLP, construct_RNN, construct_LSTM, construct_GRU, construct_BiNN
 
 def MLP(inst: LearningInstance, 
         layers: list[int], 
