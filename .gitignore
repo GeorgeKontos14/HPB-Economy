@@ -167,3 +167,6 @@ Results/**
 
 **.sh
 **.ipynb
+
+self_optimization/**
+optimized/**

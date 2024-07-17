@@ -7,6 +7,21 @@ def MLP(inst: LearningInstance,
         layers: list[int], 
         activations: list[str],
         info: int = 0):
+    """
+    Performs construction, training and testing of a Multi-Layer Perceptron
+    with the specified configurations.
+
+    Parameters:
+    inst (LearningInstance): the learning set for the model
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    info (int): amount of information to be displayed by training/ testing
+
+    Returns:
+    Sequential: the fitted model
+    float: the mse loss on the test set
+    np.ndarray: the predictions on the test set
+    """
     model: Sequential = construct_MLP(inst.x_train.shape[1:], layers, activations)
     if info > 0:
         print(model.summary())
@@ -19,6 +34,21 @@ def RNN(inst: LearningInstance,
         layers: list[int],
         activations: list[str],
         info: int = 0):
+    """
+    Performs construction, training and testing of a Recurrent Neural Network
+    with the specified configurations.
+
+    Parameters:
+    inst (LearningInstance): the learning set for the model
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    info (int): amount of information to be displayed by training/ testing
+
+    Returns:
+    Sequential: the fitted model
+    float: the mse loss on the test set
+    np.ndarray: the predictions on the test set
+    """
     model: Sequential = construct_RNN((inst.x_train.shape[1],1), layers, activations)
     if info > 0:
         print(model.summary())
@@ -31,6 +61,21 @@ def LSTM(inst: LearningInstance,
         layers: list[int],
         activations: list[str],
         info: int = 0):
+    """
+    Performs construction, training and testing of a Recurrent Neural Network
+    using Long Short Term Memory neurons with the specified configurations.
+
+    Parameters:
+    inst (LearningInstance): the learning set for the model
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    info (int): amount of information to be displayed by training/ testing
+
+    Returns:
+    Sequential: the fitted model
+    float: the mse loss on the test set
+    np.ndarray: the predictions on the test set
+    """
     model: Sequential = construct_LSTM((inst.x_train.shape[1],1), layers, activations)
     if info > 0:
         print(model.summary())
@@ -43,6 +88,21 @@ def GRU(inst: LearningInstance,
         layers: list[int],
         activations: list[str],
         info: int = 0):
+    """
+    Performs construction, training and testing of a Recurrent Neural Network
+    using Gated Recurrent Unit neurons with the specified configurations.
+
+    Parameters:
+    inst (LearningInstance): the learning set for the model
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    info (int): amount of information to be displayed by training/ testing
+
+    Returns:
+    Sequential: the fitted model
+    float: the mse loss on the test set
+    np.ndarray: the predictions on the test set
+    """
     model: Sequential = construct_GRU((inst.x_train.shape[1],1), layers, activations)
     if info > 0:
         print(model.summary())
@@ -56,6 +116,23 @@ def BiNN(inst: LearningInstance,
         activations: list[str],
         layer_types: list[int],
         info: int = 0):
+    """
+    Performs construction, training and testing of a Bidirectional Neural Network
+    with the specified configurations.
+
+    Parameters:
+    inst (LearningInstance): the learning set for the model
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    layer_types (list[int]): the type of neuron each layer should use: 0 for Simple RNN;
+    1 for GRU; 2 for LSTM
+    info (int): amount of information to be displayed by training/ testing
+
+    Returns:
+    Sequential: the fitted model
+    float: the mse loss on the test set
+    np.ndarray: the predictions on the test set
+    """
     model: Sequential = construct_BiNN((inst.x_train.shape[1],1), layers, activations, layer_types)
     if info > 0:
         print(model.summary())
@@ -63,17 +140,3 @@ def BiNN(inst: LearningInstance,
     loss = model.evaluate(inst.x_test, inst.y_test, verbose=info)
     test_predictions = model.predict(inst.x_test, verbose=info).T[0]
     return model, loss, test_predictions
-
-def predict(model: Sequential, 
-            inst: LearningInstance, 
-            lags: int, 
-            horizon: int
-            ) -> np.ndarray:
-    last = inst.low_freq[-lags:]
-    future = np.zeros(horizon)
-    for i in range(horizon):
-        p = model.predict(last.reshape(1,-1), verbose=0)[0][0]
-        future[i] = p
-        last = np.roll(last,-1)
-        last[-1] = p
-    return future

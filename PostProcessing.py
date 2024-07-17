@@ -3,6 +3,13 @@ import numpy as np
 from LearningInstance import LearningInstance
 
 def plot_test(instance: LearningInstance, predictions: np.ndarray):
+    """
+    Plots the predictions on the test set
+
+    Parameters:
+    instance (LearningInstance): the learning set evaluation has been performed on
+    predictions (np.ndarray): the predictions on the test set
+    """
     plt.figure(figsize=(15,5))
     plt.title(f"Test for {instance.country}")
     plt.plot(range(instance.start_year, 2018), instance.log_y, color="blue", label="Log GDP")
@@ -14,13 +21,21 @@ def plot_test(instance: LearningInstance, predictions: np.ndarray):
 def plot_test_and_prediction(instance: LearningInstance, 
                              test_predictions: np.ndarray, 
                              future_predictions: np.ndarray):
-    to_predict = len(future_predictions)
+    """
+    Plotsthe predictions of an ML model both for the test set and the iterative forecast
+
+    Parameters:
+    instance (LearningInstance): the learning set used
+    test_predictions (np.ndarray): the predictions among the test set
+    future_predictions (np.ndarray): the iterative forecast 
+    """
+    horizon = len(future_predictions)
     plt.figure(figsize=(15,5))
     plt.title(f"Predictions for {instance.country}")
     plt.plot(range(instance.start_year, 2018), instance.log_y, color="blue", label="Log GDP")
     plt.plot(range(instance.start_year, 2018), instance.low_freq, color="green", label="Low Freq. Trend of Log GDP")
     plt.plot(range(2018-len(test_predictions), 2018), test_predictions, color="red", label="Test Set Prediction")
-    plt.plot(range(2018, 2018+to_predict), future_predictions, color="orange", label=f"Prediction 2018-{2018+to_predict}")
+    plt.plot(range(2018, 2018+horizon), future_predictions, color="orange", label=f"Prediction 2018-{2018+horizon}")
     plt.legend()
     plt.show()
 
@@ -30,6 +45,17 @@ def plot_all_tests(instance: LearningInstance,
                    test_gru: np.ndarray,
                    test_lstm: np.ndarray,
                    test_binn: np.ndarray):
+    """
+    Plots the test predictions for all models in different subplots
+
+    Parameters:
+    instance (LearningInstance): the learning set used
+    test_mlp (np.ndarray): test predictions for MLP
+    test_rnn (np.ndarray): test predictions for RNN
+    test_gru (np.ndarray): test predictions for GRU
+    test_lstm (np.ndarray): test predictions for LSTM
+    test_binn (np.ndarray): test predictions for BiNN
+    """
     fig = plt.figure(figsize=(20, 10))
     plt.title(f"Tests for {instance.country}")
     gs = fig.add_gridspec(3,2)
@@ -79,6 +105,17 @@ def plot_all_predictions(instance: LearningInstance,
                          pred_gru: np.ndarray,
                          pred_lstm: np.ndarray,
                          pred_binn: np.ndarray):
+    """
+    Plots the forecasts for all models in the same plot
+
+    Parameters:
+    instance (LearningInstance): the learning set used
+    pred_mlp (np.ndarray): Predictions made by MLP
+    pred_rnn (np.ndarray): Predictions made by RNN
+    pred_gru (np.ndarray): Predictions made by GRU
+    pred_lstm (np.ndarray): Predictions made by LSTM
+    pred_binn (np.ndarray): Predictions made by BiNN
+    """
     to_predict = len(pred_mlp)
     plt.figure(figsize=(20,8))
     plt.title(f"Predictions for {instance.country} from 2018 to {2018+to_predict}")

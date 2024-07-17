@@ -7,6 +7,17 @@ def construct_MLP(input_shape: tuple,
                   layers: list[int], 
                   activations: list[str]
                   ) -> Sequential:
+    """
+    Constructs a Multi-Layer Perceptron with the specified configurations
+
+    Parameters:
+    input_shape (tuple): the shape of the input
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+
+    Returns:
+    Sequential: the compiled model
+    """
     model = Sequential()
     model.add(Input(shape=input_shape))
     for i, neurons in enumerate(layers):
@@ -19,6 +30,17 @@ def construct_RNN(input_shape: tuple,
                   layers: list[int],
                   activations: list[str]
                   ) -> Sequential:
+    """
+    Constructs a Recurrent Neural Network with the specified configurations
+
+    Parameters:
+    input_shape (tuple): the shape of the input
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+
+    Returns:
+    Sequential: the compiled model
+    """
     model = Sequential()
     model.add(Input(shape=input_shape))
     for i, neurons in enumerate(layers):
@@ -31,6 +53,17 @@ def construct_LSTM(input_shape: tuple,
                   layers: list[int],
                   activations: list[str]
                   ) -> Sequential:
+    """
+    Constructs a Recurrent Neural Network using Long Short Term Memory neurons with the specified configurations
+
+    Parameters:
+    input_shape (tuple): the shape of the input
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+
+    Returns:
+    Sequential: the compiled model
+    """
     model = Sequential()
     model.add(Input(shape=input_shape))
     for i, neurons in enumerate(layers):
@@ -43,6 +76,17 @@ def construct_GRU(input_shape: tuple,
                   layers: list[int],
                   activations: list[str]
                   ) -> Sequential:
+    """
+    Constructs a Recurrent Neural Network using Gated Recurrent Unit neurons with the specified configurations
+
+    Parameters:
+    input_shape (tuple): the shape of the input
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+
+    Returns:
+    Sequential: the compiled model
+    """
     model = Sequential()
     model.add(Input(shape=input_shape))
     for i, neurons in enumerate(layers):
@@ -56,6 +100,19 @@ def construct_BiNN(input_shape: tuple,
                   activations: list[str],
                   layer_types: list[int]
                   ) -> Sequential:
+    """
+    Constructs a Bidirectional Neural Network with the specified configurations
+
+    Parameters:
+    input_shape (tuple): the shape of the input
+    layers (list[int]): the list containing how many neurons each layer should have
+    activations (list[str]): the list with the activation function each layer should use
+    layer_types (list[int]): the type of neuron each layer should use: 0 for Simple RNN;
+    1 for GRU; 2 for LSTM
+    
+    Returns:
+    Sequential: the compiled model
+    """
     model = Sequential()
     model.add(Input(shape=input_shape))
     for i, neurons in enumerate(layers):
