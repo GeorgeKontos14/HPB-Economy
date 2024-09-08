@@ -1,11 +1,11 @@
 import numpy as np
 import csv
-from PreProcessing import preprocess_data, learning_set
-from LearningInstance import LearningInstance
-from ConstructModels import construct_BiNN, construct_LSTM, construct_MLP, construct_RNN, construct_GRU
-from NeuralNetworks import MLP, RNN, BiNN, GRU, LSTM
+from NeuralNetwork.PreProcessing import preprocess_data, learning_set
+from NeuralNetwork.LearningInstance import LearningInstance
+from NeuralNetwork.ConstructModels import construct_BiNN, construct_LSTM, construct_MLP, construct_RNN, construct_GRU
+from NeuralNetwork import MLP, RNN, BiNN, GRU, LSTM
 from Utils.NeuralNetworkUtils import predict, run_all_countries, fit_and_predict_all_countries
-from PostProcessing import plot_test_and_prediction, plot_all_tests, plot_all_predictions
+from NeuralNetwork.PostProcessing import plot_test_and_prediction, plot_all_tests, plot_all_predictions
 
 n = 113
 T = 118
