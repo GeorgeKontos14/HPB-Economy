@@ -1,129 +1,69 @@
 from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import Dense, Input, SimpleRNN, LSTM, GRU, Bidirectional # type: ignore
-from tensorflow.keras.losses import mse # type: ignore
-from NeuralNetwork.LearningInstance import LearningInstance
+from tensorflow.keras.layers import Dense, Input, SimpleRNN # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
 
-def construct_MLP(input_shape: tuple, 
-                  layers: list[int], 
-                  activations: list[str]
-                  ) -> Sequential:
+def build_MLP(
+        learning_rate: float, 
+        num_layers: int, 
+        num_units: int, 
+        lags: int
+    ) -> Sequential:
     """
-    Constructs a Multi-Layer Perceptron with the specified configurations
+    Constructs a Multi-Layer Perceptron with the specified configurations:
 
     Parameters:
-    input_shape (tuple): the shape of the input
-    layers (list[int]): the list containing how many neurons each layer should have
-    activations (list[str]): the list with the activation function each layer should use
+    learning_rate (float): The learning rate of the neurons
+    num_layers (int): The number of layers of the model
+    num_units (int): The number of neurons in each layer
+    lags (int): The number of past values to be considered for each prediction
 
     Returns:
-    Sequential: the compiled model
+    Sequential: The constructed MLP
     """
     model = Sequential()
-    model.add(Input(shape=input_shape))
-    for i, neurons in enumerate(layers):
-        model.add(Dense(neurons, activation=activations[i]))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss=mse)
-    return model
+    model.add(Input(shape=(lags,)))
 
-def construct_RNN(input_shape: tuple,
-                  layers: list[int],
-                  activations: list[str]
-                  ) -> Sequential:
-    """
-    Constructs a Recurrent Neural Network with the specified configurations
-
-    Parameters:
-    input_shape (tuple): the shape of the input
-    layers (list[int]): the list containing how many neurons each layer should have
-    activations (list[str]): the list with the activation function each layer should use
-
-    Returns:
-    Sequential: the compiled model
-    """
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    for i, neurons in enumerate(layers):
-        model.add(SimpleRNN(neurons, return_sequences=i<len(layers)-1, activation=activations[i]))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss=mse)
-    return model
-
-def construct_LSTM(input_shape: tuple,
-                  layers: list[int],
-                  activations: list[str]
-                  ) -> Sequential:
-    """
-    Constructs a Recurrent Neural Network using Long Short Term Memory neurons with the specified configurations
-
-    Parameters:
-    input_shape (tuple): the shape of the input
-    layers (list[int]): the list containing how many neurons each layer should have
-    activations (list[str]): the list with the activation function each layer should use
-
-    Returns:
-    Sequential: the compiled model
-    """
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    for i, neurons in enumerate(layers):
-        model.add(LSTM(neurons, return_sequences=i<len(layers)-1, activation=activations[i]))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss=mse)
-    return model
-
-def construct_GRU(input_shape: tuple,
-                  layers: list[int],
-                  activations: list[str]
-                  ) -> Sequential:
-    """
-    Constructs a Recurrent Neural Network using Gated Recurrent Unit neurons with the specified configurations
-
-    Parameters:
-    input_shape (tuple): the shape of the input
-    layers (list[int]): the list containing how many neurons each layer should have
-    activations (list[str]): the list with the activation function each layer should use
-
-    Returns:
-    Sequential: the compiled model
-    """
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    for i, neurons in enumerate(layers):
-        model.add(GRU(neurons, return_sequences=i<len(layers)-1, activation=activations[i]))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss=mse)
-    return model
-
-def construct_BiNN(input_shape: tuple,
-                  layers: list[int],
-                  activations: list[str],
-                  layer_types: list[int]
-                  ) -> Sequential:
-    """
-    Constructs a Bidirectional Neural Network with the specified configurations
-
-    Parameters:
-    input_shape (tuple): the shape of the input
-    layers (list[int]): the list containing how many neurons each layer should have
-    activations (list[str]): the list with the activation function each layer should use
-    layer_types (list[int]): the type of neuron each layer should use: 0 for Simple RNN;
-    1 for GRU; 2 for LSTM
+    for _ in range(num_layers):
+        model.add(Dense(int(num_units), activation='relu'))
     
+    model.add(Dense(1))
+
+    model.compile(
+        optimizer=Adam(learning_rate=learning_rate), 
+        loss = 'mean_squared_error'
+    )
+
+    return model
+
+
+def build_RNN(learning_rate, num_layers, num_units, lags):
+    """
+    Constructs a Recurrent Neural Network with the specified configurations:
+
+    Parameters:
+    learning_rate (float): The learning rate of the neurons
+    num_layers (int): The number of layers of the model
+    num_units (int): The number of neurons in each layer
+    lags (int): The number of past values to be considered for each prediction
+
     Returns:
-    Sequential: the compiled model
+    Sequential: The constructed MLP
     """
     model = Sequential()
-    model.add(Input(shape=input_shape))
-    for i, neurons in enumerate(layers):
-        ret = i<len(layers)-1
-        if layer_types[i] == 0:
-            layer = SimpleRNN(neurons, return_sequences=ret, activation=activations[i])
-        elif layer_types[i] == 1:
-            layer = GRU(neurons, return_sequences=ret, activation=activations[i])
-        else:
-            layer = LSTM(neurons, return_sequences=ret, activation=activations[i])
-        model.add(Bidirectional(layer))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss=mse)
+    
+    model.add(Input(shape=(lags,1)))
+
+    # Add LSTM layers
+    for i in range(num_layers):
+            model.add(SimpleRNN(int(num_units), return_sequences=i<num_layers-1))
+    
+    # Output layer for regression
+    model.add(Dense(1, activation='linear'))
+
+    # Compile the model
+    model.compile(
+        optimizer=Adam(learning_rate=learning_rate),
+        loss='mean_squared_error'
+    )
+
     return model
