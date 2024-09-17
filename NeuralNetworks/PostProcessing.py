@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from NeuralNetwork.LearningInstance import LearningInstance
+from NeuralNetworks.LearningInstance import LearningInstance
 
 def plot_test(instance: LearningInstance, predictions: np.ndarray):
     """

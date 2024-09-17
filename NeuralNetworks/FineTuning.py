@@ -3,8 +3,8 @@ from skopt import gp_minimize
 from skopt import Real, Integer
 from tensorflow.keras.models import Sequential # type: ignore
 
-from NeuralNetwork.LearningInstance import LearningInstance
-from NeuralNetwork.ConstructModels import build_MLP, build_RNN
+from NeuralNetworks.LearningInstance import LearningInstance
+from NeuralNetworks.ConstructModels import build_MLP, build_RNN
 
 def tune_MLP(
         instance: LearningInstance, 
