@@ -45,10 +45,6 @@ def preprocessing(
     q0_gdp = 16
     log_gdp, low_gdp = preprocess_data(gdp, T_gdp, q_gdp, q0_gdp)
 
-    areas = [strip_nan(area) for area in areas]
-
-    pop = [strip_nan(c_pop) for c_pop in pop]
-
     temp = []
     for c in labor:
         last_ind = T_labor-1
@@ -59,17 +55,14 @@ def preprocessing(
 
     temp = []
     for c in currency:
-        last_ind = T_currency-1
-        while np.isnan(c[last_ind]):
-            last_ind -= 1
         temp.append(strip_nan(c[:last_ind]))
     currency = temp
 
     countries: list[Country] = []
     for i in range(n):
         countries.append(Country(
-            names[i], low_gdp[i], locations[i][0], locations[i][1],
-            areas[i], pop[i], labor[i], currency[i] 
+            names[i], log_gdp[i, -T_currency:], locations[i][0], locations[i][1],
+            areas[i], pop[i, -T_currency:], labor[i], currency[i] 
         ))
 
     return countries

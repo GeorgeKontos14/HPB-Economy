@@ -48,7 +48,7 @@ class Country:
         Returns:
         np.ndarray: The feature vector for the specified country
         """
-        features = np.zeros(22)
+        features = np.zeros(12)
 
         # Features regarding the gdp:
         features[:6] = time_series_features(self.gdp, h)
@@ -58,24 +58,14 @@ class Country:
         features[7] = self.latitude
 
         # Features regarding the area:
-        features[8] = np.mean(self.area)
-        features[9] = np.var(self.area)
+        features[8] = self.area[-1]
+        features[9] = np.nanmax(self.area)-np.nanmin(self.area)
 
         # Features regarding population and labor force:
         features[10] = np.mean(self.population)
         features[11] = np.var(self.population)
-        features[12] = self.population[-1]
-        features[13] = np.max(self.population) - np.min(self.population)
-        features[14] = np.mean(self.working_population)
-        features[15] = np.var(self.working_population)
-        features[16] = self.working_population[-1]
-        features[17] = np.max(self.working_population)-np.min(self.working_population)
 
-        # Features regarding the currency exchange rates:
-        features[18] = np.mean(self.currency)
-        features[19] = np.var(self.currency)
-        features[20] = self.currency[-1]
-        features[21] = np.max(self.currency) - np.min(self.currency)
+
 
         return features
     
