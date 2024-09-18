@@ -28,3 +28,10 @@ The [NeuralNetworks](/NeuralNetworks) directory contains all the necessary modul
 
 The [Clustering](/Clustering) directory contains all the necessary modules for clustering the countries using hierarchical and spectral clustering(To be implemented). Specifically:
 - [PreProcessing.py](/Clustering/PreProcessing.py): The pre-processing functions required to construct the final dataset
+- [Outliers.py](/Clustering/Outliers.py): Functions for outlier detection through clustering, using the DBSCAN algorithm
+- [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clusters
+- [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
+
+### Utilities
+
+- [DataUtils.py](/Utils/DataUtils.py): Utility functions for reading and writing data to files.
