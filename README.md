@@ -30,8 +30,11 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 - [PreProcessing.py](/Clustering/PreProcessing.py): The pre-processing functions required to construct the final dataset
 - [Outliers.py](/Clustering/Outliers.py): Functions for outlier detection through clustering, using the DBSCAN algorithm
 - [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clusters
+- [SpectralClustering.py](/Clustering/SpectralClustering.py): Functionality for tuning and implementing the different spectral clustering algorithms
 - [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
+- [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task
 
 ### Utilities
 
 - [DataUtils.py](/Utils/DataUtils.py): Utility functions for reading and writing data to files.
+- [VisualUtils.py](/Utils/VisualUtils.py): Utility functions for visualizing results
