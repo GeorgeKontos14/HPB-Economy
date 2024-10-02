@@ -57,7 +57,7 @@ def dbscan(
     model = DBSCAN(eps=epsilon, min_samples=min_pts).fit(data)
     return model.labels_
 
-def remove_outliers(
+def remove_outliers_dbscan(
         countries: list[str],
         data: pd.DataFrame,
         verbose: bool = False
