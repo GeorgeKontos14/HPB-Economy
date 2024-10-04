@@ -1,6 +1,10 @@
 import numpy as np
+
 import pandas as pd
+
 import matplotlib.pyplot as plt
+
+from Utils.TimeSeriesUtils import cluster_centroids
 
 def show_multiple_countries(
         codes: list[str],
@@ -53,7 +57,12 @@ def plot_clusters(
         k: int,
         data: np.ndarray,
         cluster_centers: np.ndarray,
-        labels: np.ndarray
+        labels: np.ndarray,
+        rows: int,
+        columns: int,
+        start_year: int,
+        T: int,
+        title: str = None
     ):
     """
     Plots the clusters and their centroids in separate subplots
@@ -63,14 +72,22 @@ def plot_clusters(
         data (np.ndarray): The dataset that has been clustered
         cluster_centers (np.ndarray): The centroids of the clusters
         labels (np.ndarray): The labels that the clustering algorithm assigns to the data
+        rows (int): The number of rows of subplots
+        columns (int): The number of columns of subplots 
+        start_year (int): The first year of observations
+        T (int): The duration of the time series
+        title (str): The title to be used in the graph
     """
-    plt.figure(figsize=(20, 5))
+    time = np.arange(start_year, start_year+T)
+    plt.figure(figsize=(20, 10))
+    if title is not None:
+        plt.suptitle(title)
     for yi in range(k):
-        plt.subplot(2, int(k/2)+1, yi+1)
+        plt.subplot(rows, columns, yi+1)
         for xx in data[labels == yi]:
-            plt.plot(xx.ravel(), 'k-', alpha=.2)
-        plt.plot(cluster_centers[yi].ravel(), 'r-')
-        plt.text(0.55, 0.85,'Cluster %d' % (yi + 1),
+            plt.plot(time, xx.ravel(), 'k-', alpha=.2)
+        plt.plot(time, cluster_centers[yi].ravel(), 'lime')
+        plt.text(0.55, 0.85, f'Cluster {yi+1}',
                 transform=plt.gca().transAxes)
 
 def show_clustering(
@@ -79,7 +96,12 @@ def show_clustering(
         data: np.ndarray,
         cluster_centers: np.ndarray,
         labels: np.ndarray,
-        score: float
+        score: float,
+        rows: int,
+        columns: int,
+        start_year: int,
+        T: int,
+        title: str = None
     ) -> list[list[str]]:
     """
     Displays all relevant information for a clustering algorithm instance, including the visualization of the clusters, the silhouette score, and which countries are assigned to each cluster
@@ -91,12 +113,39 @@ def show_clustering(
         cluster_centers (np.ndarray): The centroids of the clusters
         labels (np.ndarray): The labels that the clustering algorithm assigns to the data
         score (float): The silhouette score of the clustering
+        rows (int): The number of rows of subplots
+        columns (int): The number of columns of subplots
+        start_year (int): The first year of observations
+        T (int): The duration of the time series
+        title (str): The title to be used in the graph
     
     Returns:
         list[list[str]]: The list containing the country names per cluster
     """
-    plot_clusters(k, data, cluster_centers, labels)
+    plot_clusters(k, data, cluster_centers, labels, rows, columns, start_year, T, title)
 
+    clusters = summarize_clustering(countries, k, labels, score)
+    
+    return clusters
+
+def summarize_clustering(
+        countries: list[str],
+        k: int,
+        labels: np.ndarray,
+        score: float
+    ) -> list[list[str]]:
+    """
+    Presents a summary of the clustering results
+
+    Parameters:
+        countries (list[str]): The ISO3 country codes of all the clustered countries
+        k (int): The number of clusters
+        labels (np.ndarray): The labels that the clustering algorithm assigns to the data
+        score (float): The silhouette score of the clustering
+    
+    Returns:
+        list[list[str]]: The list containing the country names per cluster
+    """
     print(f"Silhouette Score: {score}")
 
     clusters = [[] for _ in range(k)]
@@ -104,7 +153,41 @@ def show_clustering(
         members = np.where(labels == i)[0]
         for member in members:
             clusters[i].append(countries[member])
-        print(f"Cluster #{i} size: {len(clusters[i])}")
-        print(f"Cluster #{i} members: {', '.join(clusters[i])}")
+        print(f"Cluster #{i+1} size: {len(clusters[i])}")
+        print(f"Cluster #{i+1} members: {', '.join(clusters[i])}")
     
     return clusters
+
+def plot_centroids_outliers(
+        cluster_centers: np.ndarray,
+        outliers: np.ndarray,
+        start_year: int,
+        T: int,
+        title: str = None
+    ):
+    """
+    Plots the cluster centers and outliers on the same graph. The outliers are plotted in red and the cluster centers are plotted in green
+
+    Parameters:
+        cluster_centers (np.ndarray): The centroids determined by the clustering algorithm
+        outliers (np.ndarray): The outlier data, eliminated from the clustered dataset
+        start_year (int): The first year of observations
+        T (int): The duration of the time series
+        title (str): The title to be used in the graph
+    """
+    time = np.arange(start_year, start_year+T)
+
+    plt.figure(figsize=(20,5))
+    if title is not None:
+        plt.suptitle(title)
+    
+    for center in cluster_centers:
+        plt.plot(time, center.ravel(), 'lime')
+    
+    for outlier in outliers:
+        plt.plot(time, outlier.ravel(), 'red')
+
+    centers_line = plt.Line2D([0],[0], color='lime', lw=2)
+    outliers_line = plt.Line2D([0], [0], color='red', lw=2)
+
+    plt.legend([centers_line, outliers_line], ['Centroids', 'Outliers'])

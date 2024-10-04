@@ -1,6 +1,9 @@
 import pandas as pd
+
 import warnings
+
 import numpy as np
+
 from tslearn.clustering import KernelKMeans, KShape, TimeSeriesKMeans
 
 with warnings.catch_warnings():
@@ -10,7 +13,7 @@ with warnings.catch_warnings():
 def kmeans_euclidean(
         data: pd.DataFrame, 
         k: int, 
-        n_init: int =25
+        n_init: int =100
     ):
     """
     Performs k-Means clustering using Euclidean distance
@@ -34,7 +37,7 @@ def kmeans_euclidean(
 def kmeans_dtw(
         data: pd.DataFrame, 
         k: int, 
-        n_init: int =25
+        n_init: int =100
     ):
     """
     Performs k-Means clustering using dynamic time warping (DTW)
@@ -58,7 +61,7 @@ def kmeans_dtw(
 def kshape(
         data: pd.DataFrame, 
         k: int, 
-        n_init: int =25
+        n_init: int =100
     ):
     """
     Performs k-Shape clustering for the time series
@@ -80,7 +83,7 @@ def kshape(
 def kmedoids_dtw(
         data: pd.DataFrame, 
         k: int, 
-        n_init: int =25
+        n_init: int =100
     ):
     """
     Performs k-Medoids clustering using Dynamic Time Warping (DTW)
@@ -104,7 +107,7 @@ def kmedoids_dtw(
 def kernel_k_means(
         data: pd.DataFrame, 
         k: int, 
-        n_init: int =25
+        n_init: int =100
     ) -> np.ndarray:
     """
     Performs kernel k-Means clustering

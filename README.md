@@ -1,18 +1,74 @@
-# Economy-and-Population-Growth
+# Investigation of Machine Learning approaches for long-horizon forecasting of international financial growth dynamics
 
 This research project is being carried out by Geroge Kontos, an Honours Student of the Honours Programme Bachelor of TU Delft. The research is being conducted under the supervision of Dr. N. Parolya.
 
-## Project Description
+## Abstract
 
-This project aims to investigate the effectiveness of machine learning approaches for long-horizon forecasting of international financial growth. This project uses the predictions published by Dr. U.K. Mueller, Dr. J.H.Stock and Dr. Mark. W. Watson in their work **An Econometric Model of International Growth Dynamics for Long-horizon Forecasting** as a baseline for evaluation and comparisons of the foundings of machine learning models.
+This project aims to investigate the effectiveness of machine learning approaches for long-horizon forecasting of international financial growth. This project uses the predictions published by Dr. U.K. Mueller, Dr. J.H.Stock and Dr. Mark. W. Watson in their work [An Econometric Model of International Growth Dynamics for Long-horizon Forecasting](https://direct.mit.edu/rest/article/104/5/857/97738/An-Econometric-Model-of-International-Growth) as a baseline for evaluation and comparisons of the foundings of machine learning models.
 
 To the end of providing high quality predictions, two types of machine learning algorithms are being used; clustering algorithms and regressive neural network. Clustering allows grouping the GDP growth of different countries that present similar characteristics together. Afterwards, regressive neural networks can be tuned to perform iterative predictions on the GDP data of each country. Tuning one neural network per cluster significantly increases the computational effeciency.
 
-## Project Sections
+## Process and Findings
+
+### Clustering
+
+In order to find a suitable way to cluster the evolution of annual GDP per capita of countries, the three most popular clustering approaches were examined: hierarchical clustering, spectral clustering and partional clustering. For hierarchical clustering and majority of the experiments with spectral clustering, the data set was augmented with population and bilateral currency exchange rate (against the US Dollar) per annum for each country, in an attempt to find out whether such information can provide any major insights.
+
+#### Clustering-Based Outlier Detection
+
+For hierarchical algorithms, DBSCAN was employed to perform clustering-based outlier detection. The parameters of the algorithm were determined by common heuristics. The complete implementation of the algorithm can be found in [Outliers.py](/Clustering/Outliers.py).
+
+#### (Explicit) Centroid Calculation
+
+Clustering in this problem is ultimately used to reduce the number of neural networks that must be tuned. However, in order to train one neural network per cluster, it is necessary to derive some common ground for all members of the clusters. While centroids are implicitly calculated and outputed by partitional algorithms on the GDP data, for algorithms like Kernel $k$-means or hierarchical clustering such cluster centers are not available. Inspired by the time series-specific implementation of the $k$-means algorithm, we explicitly calculate centroids whenever necessary using the [DTW (i.e. Dynamic Time Warping) Barycenter Averaging (DBA)](https://www.sciencedirect.com/science/article/abs/pii/S003132031000453X) algorithm. The selected configuration of the DBA algorithm is located in [TimeSeriesUtils.py](/Utils/TimeSeriesUtils.py).
+
+#### [Hierarchical Clustering](/hierarchical_clustering.ipynb)
+
+Hierarchical clustering was performed on the augmented dataset, considering GDP per capita, population, and currency exchange rate per anum for each country, from 1960 until 2017. For the clustering algorithm to be more reasonable, as clustering on $174$ features would be unconventional, dimensionality reduction by Principal Component Analysis (PCA) is used. After the dataset is reduced, DBSCAN was used to detect outliers; in this case, China, India, Indonesia, Iran and Vietnam were removed from the dataset.
+
+Four different linkage methods were tested for this algorithm; complete, average, single and ward linkage. Ward linkage turned out to be the best suited for this problem, producing the most balanced dendogram and the highest silhouette score performance. 
+
+![Ward Linkage Dendrogram](/Images/Clustering/Hierachical/ward_linkage.png)
+
+However, even though the dendogram suggests clear clusters, this is not translated successfully to the GDP time series. While some of the data demonstrates intra-cluster similarities, the different clusters are completely undistinguishable visually.
+
+![Hiearchical Clustering](/Images/Clustering/Hierachical/hierarchical_clusters_plot.png)
+
+Furthermore, outlier detection performed on the PCA-reduced dataset is not effective in detecting outlier time series. On the contrary, some of the outliers seem to have very similar structure and magnitude with some of the centroids.
+
+![Hierarchical Clustering Centroids and Outliers](/Images/Clustering/Hierachical/hier_centroids_outliers.png)
+
+#### [Spectral Clustering](/spectral_clustering.ipynb)
+
+Spectral Clustering was performed in both the original and augmented dataset, with different configurations. The number of clusters are determined by the 'Eigengap' Heuristic suggested by literature.
+
+![Eigenvalues Plot with Eigengap](/Images/Clustering/Spectral/eigengap.png)
+
+Three different types of similarity matrices where used: $k$-neighbors graph  and $\epsilon$-neighborhood with Euclidean Distance Measure, as well as a $k$-neighbors graph with DTW as a dissimilarity measure. The versions using Euclidean Distance suggest heavy imbalance of the clusters; in fact, the $\epsilon$-neighborhood version splits the data in 19 different clusters, with 18 of them having no more than 6 countries each, and one of them having 66 countries. Even though the version using DTW provides the most balanced result and achieves the best silhouette score of the three algorithms, its clusters lack withing group similarity. This becomes even clearer when observing the (explicitely calculated) centroids.
+
+![Spectral Clusterin](/Images/Clustering/Spectral/spectral_clusters_plot.png)
+
+#### [Partitional Clustering](/partitional_clustering.ipynb)
+
+Literature has shown that several popular partitional algorithms can be adjusted to work better with time series by leveraging the concept of [dynamic time warping](https://rtavenar.github.io/blog/dtw.html) and all the related structures and algorithms (DTW Barycenter Averaging, Global Alignment Kernels, etc.). In this work, five such algorithms are tested: traditional $k$-Means (using Euclidean Distance), $k$-Means using DTW distance, [$k$-Shapes](https://sigmodrecord.org/publications/sigmodRecord/1603/pdfs/18_kShape_RH_Paparrizos.pdf), [$k$-Medoids](https://wis.kuleuven.be/stat/robust/papers/publications-1987/kaufmanrousseeuw-clusteringbymedoids-l1norm-1987.pdf) using DTW distance and [kernel $k$-Means](https://www.cs.utexas.edu/~inderjit/public_papers/kdd_spectral_kernelkmeans.pdf) using the Global Alignment Kernel (GAK) as a kernel function. In order to determine which algorithm is optimal and with which number of clusters, the elbow heuristic was used. Only the annual GDP per capita data was considered.
+
+![Elbow Plot](/Images/Clustering/Partitional/elbow_plot.png)
+
+$4$-Means and $4$-Medoids using DTW perform the best, achieveing nearly identical results. They form well-structured clusters with mostly similar time-series shape and time-series. Generally, all 5 partitional algorithms, when used with 3-5 clusters, significantly outperform hierarchical and spectral approaches in terms of silhouette score.
+
+![4-Means with DTW](/Images/Clustering/Partitional/4_means_full.png)
+
+![4-Medoids with DTW](/Images/Clustering/Partitional/4_medoids_full.png)
+
+#### Conclusion
+
+Based on these results, we can conclude that the order of performance of the three approaches is clear; hierarchical clustering performs the worst, while partitional clustering performs the best. For the remainder of this project, the $4$-Means algorithm using DTW will be preferred over the $4$-Medoids version, because $k$-Medoids only considers input data as possible centroids, which, while robust to outliers, might not be optimal in representing the majority of the data within a cluster.
+
+## Directories and Modules
 
 ### Replication of Previous Work
 
-The [SCC_Replication](/SCC_Replication) directory contains a Python implementation of the Gibbs Sampler described by Ulrich K. Muller, James H. Stock and Mark W. Watson in their work **An Econometric Model of International Growth Dynamics for Long-horizon Forecasting**,as well as a documentation of the previous Fortran90 implementation. A Markov Chain Monte Carlo algorithm is used to estimate the distribution of specific parameters of the cross-country linear econometric model they describe.
+The [SCC_Replication](/SCC_Replication) directory contains a Python implementation of the Gibbs Sampler described by Ulrich K. Muller, James H. Stock and Mark W. Watson in their work [An Econometric Model of International Growth Dynamics for Long-horizon Forecasting](https://direct.mit.edu/rest/article/104/5/857/97738/An-Econometric-Model-of-International-Growth),as well as a documentation of the previous Fortran90 implementation. A Markov Chain Monte Carlo algorithm is used to estimate the distribution of specific parameters of the cross-country linear econometric model they describe.
 
 ### Neural Networks
 
@@ -40,3 +96,4 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 
 - [DataUtils.py](/Utils/DataUtils.py): Utility functions for reading and writing data to files.
 - [VisualUtils.py](/Utils/VisualUtils.py): Utility functions for visualizing results
+- [TimeSeriesUtilities.py](/Utils/TimeSeriesUtils.py): Utility functions for time series processing

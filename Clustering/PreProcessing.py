@@ -1,8 +1,11 @@
 import numpy as np
+
 import pandas as pd
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.impute import KNNImputer
+
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 
 def fill_data(arr: np.ndarray, neighbors: int = 3) -> np.ndarray:

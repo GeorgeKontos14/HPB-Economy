@@ -1,10 +1,18 @@
+import warnings
+
 import numpy as np
+
 import pandas as pd
+
 import matplotlib.pyplot as plt
+
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import KMeans
+
 from scipy.spatial.distance import pdist, squareform
 from scipy.sparse.csgraph import laplacian
+
+from tslearn.neighbors import KNeighborsTimeSeries
 
 def knn_graph(
         n: int, 
@@ -54,6 +62,28 @@ def epsilon_graph(
     
     return np.where(S < eps, S, 0)
 
+def dtw_knn_graph(
+        n: int, 
+        df: pd.DataFrame
+    ) -> np.ndarray:
+    """
+    Constructs the k-nearest neighbors graph of the dataset using DTW as a distance measure. k is determined heuristically as floor(n**0.5).
+
+    Parameters:
+        n (int): The number of points in the dataset
+        df (pd.Dataframe): The dataset for which the graph is constructed
+
+    Returns:
+    np.ndarray: The n X n weighted adjacency matrix representing the k-nn graph of the dataset.
+    """
+    n_neighbors = int(np.floor(n**0.5))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        W = KNeighborsTimeSeries(n_neighbors=n_neighbors, metric='dtw').fit(
+            df).kneighbors_graph(df, mode='distance')
+
+    return W.toarray()
+
 def laplacian_eigen(
         n: int,
         W: np.ndarray,
@@ -80,7 +110,7 @@ def laplacian_eigen(
     if verbose:
         plt.figure(figsize=(15,7))
         plt.title("(Ordered) Eigenvalue Plot of the Laplacian Matrix")
-        plt.scatter(range(n), np.sort(eigvals.real))
+        plt.stem(range(n), np.sort(eigvals.real))
         plt.show()
     
     return eigvals, eigvecs
@@ -122,30 +152,18 @@ def smallest_eigenvecs(
 def kmeans(
         H: np.ndarray, 
         k: int, 
-        countries: list[str],
-        verbose: bool = False
-    ) -> list:
+    ) -> np.ndarray:
     """
     Performs k-means clustering on the reduced dataset
 
     Parameters:
         H (np.ndarray): The dataset to be clustered
         k (int): The number of clusters
-        countries (list[str]): A list containing the ISO3 country codes for all countries
-        verbose (bool): Indicates whether or not to display information
     
     Returns:
-        list: A list where each item is a list containing the countries that are in a cluster
+        np.ndarray: The cluster labels
     """
-    k_means = KMeans(n_clusters=k).fit(H)
+    k_means = KMeans(n_clusters=k, n_init=100).fit(H)
     labels = k_means.labels_
 
-    clusters = [[] for _ in range(k)]
-    for i, label in enumerate(labels):
-        clusters[label].append(countries[i])
-    
-    if verbose:
-        for cluster in clusters:
-            print(cluster)
-
-    return clusters
+    return labels
