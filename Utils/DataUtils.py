@@ -2,11 +2,14 @@ import numpy as np
 
 import csv
 
+import geopandas as gp
+
 def load_clustering_data(
         names_path: str,
         gdp_path: str,
         population_path: str,
         currency_path: str,
+        map_path: str,
         n: int,
         T_gdp: int,
         T_pop: int,
@@ -20,6 +23,7 @@ def load_clustering_data(
         gdp_path (str): The path to the file containing each country's GDP data
         population_path (str): The path to the file containing each country's population data
         currency_path (str): The path to the file containing each country's currency exchange rate data
+        map_path (str): The path to the map data
         n (int): The number of countries in the dataset
         T_gdp (int): The amount of years GDP data is available for (ending in 2017)
         T_pop (int): The amount of years population data is available for (ending in 2017)
@@ -30,6 +34,7 @@ def load_clustering_data(
         np.ndarray: The annual GDP per capita data for each country
         np.ndarray: The annual population data for each country
         np.ndarray: The annual bilateral exchange rate of each country's currency
+        gd.GeoDataFrame: The map, used for visualization of clustering results
     """
     names = []
     with open(names_path, 'r') as file:
@@ -58,4 +63,6 @@ def load_clustering_data(
             for j, val in enumerate(row):
                 currency[i][j] = float(val)
 
-    return names, gdp, pop, currency
+    world = gp.read_file(map_path)
+
+    return names, gdp, pop, currency, world

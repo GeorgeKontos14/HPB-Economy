@@ -2,6 +2,8 @@ import numpy as np
 
 import pandas as pd
 
+import geopandas as gp
+
 import matplotlib.pyplot as plt
 
 from Utils.TimeSeriesUtils import cluster_centroids
@@ -191,3 +193,36 @@ def plot_centroids_outliers(
     outliers_line = plt.Line2D([0], [0], color='red', lw=2)
 
     plt.legend([centers_line, outliers_line], ['Centroids', 'Outliers'])
+
+def show_clusters_on_map(
+        countries: list[str],
+        labels: np.ndarray,
+        world: gp.GeoDataFrame,
+        title: str = None  
+    ):
+    """
+    Visualizes the clustering results on a world map
+
+    Parameters:
+        countries (list[str]): The ISO3 country codes of all the clustered countries for all countries in the dataset
+        labels (np.ndarray): The labels that the clustering algorithm assigns to the data
+        world (gp.GeoDataFrame): The dataframe containing map information
+        title (str): The title to be used in the graph
+    """
+    y_frame = pd.DataFrame({
+        'CODE': countries,
+        'LABEL': labels
+    })
+
+    df = world.merge(y_frame, how='inner', left_on='ISO_A3_EH', right_on='CODE')
+
+    fig, ax = plt.subplots(1,1, figsize=(15,10))
+    fig.patch.set_facecolor('black')
+    if title is not None:
+        plt.title(title, color='white')
+    
+    df.plot(column='LABEL', ax=ax)
+    ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()

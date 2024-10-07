@@ -54,17 +54,28 @@ Literature has shown that several popular partitional algorithms can be adjusted
 
 ![Elbow Plot](/Images/Clustering/Partitional/elbow_plot.png)
 
-$4$-Means and $4$-Medoids using DTW perform the best, achieveing nearly identical results. They form well-structured clusters with mostly similar time-series shape and time-series. Generally, all 5 partitional algorithms, when used with 3-5 clusters, significantly outperform hierarchical and spectral approaches in terms of silhouette score.
+$4$-Means and $4$-Medoids using DTW perform the best, achieveing nearly identical results. They form well-structured clusters with mostly similar time-series shape and time-series. For each of the two algorithms, the clusters and their visualization on the world map are shown below. Countries that are not included in the dataset are also omitted from the map. Generally, all 5 partitional algorithms, when used with 3-5 clusters, significantly outperform hierarchical and spectral approaches in terms of silhouette score. 
 
 ![4-Means with DTW](/Images/Clustering/Partitional/4_means_full.png)
+![4-Means with DTW (map)](/Images/Clustering/Partitional/4_means_map.png)
 
 ![4-Medoids with DTW](/Images/Clustering/Partitional/4_medoids_full.png)
+![4-Medoids with DTW (map)](/Images/Clustering/Partitional/4_medoids_map.png)
 
 #### Conclusion
 
 Based on these results, we can conclude that the order of performance of the three approaches is clear; hierarchical clustering performs the worst, while partitional clustering performs the best. For the remainder of this project, the $4$-Means algorithm using DTW will be preferred over the $4$-Medoids version, because $k$-Medoids only considers input data as possible centroids, which, while robust to outliers, might not be optimal in representing the majority of the data within a cluster.
 
 ## Directories and Modules
+
+### Home Directory
+
+Jupyter notebooks in the home directory document different algorithms and experiments followed in this project. Specifically:
+- [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
+- [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task
+- [timeseries_clustering.ipynb](/partitional_clustering.ipynb): Provides a detailed process for finding the best partioning approaches to time series clustering.
+- [neuralnetworks.ipynb](/neuralnetworks.ipynb): Provides a detailed explenation of how neuralnetworks are tuned and used for iterative forecasting
+- [pipeline.ipynb](/pipeline.ipynb): Demonstrates the final pipeline used for making country clustering, GDP predictions, and comparisons to previous work
 
 ### Replication of Previous Work
 
@@ -88,9 +99,6 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 - [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clusters
 - [SpectralClustering.py](/Clustering/SpectralClustering.py): Functionality for tuning and implementing the different spectral clustering algorithms
 - [TimeSeriesPartitioning.py](/Clustering/TimeSeriesPartitions.py): Functionality for implementing partitioning algorithms specifically designed for time series clustering
-- [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
-- [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task
-- [timeseries_clustering](/partitional_clustering.ipynb): Provides a detailed process for finding the best partioning approaches to time series clustering.
 
 ### Utilities
 
