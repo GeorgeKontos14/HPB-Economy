@@ -6,7 +6,7 @@ import geopandas as gp
 
 import matplotlib.pyplot as plt
 
-from Utils.TimeSeriesUtils import cluster_centroids
+import networkx as nx
 
 def show_multiple_countries(
         codes: list[str],
@@ -223,6 +223,48 @@ def show_clusters_on_map(
     
     df.plot(column='LABEL', ax=ax)
     ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_group_graph(
+        members: list[str], 
+        edges: list, 
+        edge_colors: list[str], 
+        edge_thickness: list[float], 
+        title: str = None
+    ):
+    """
+    Plots the grap for a group of countries
+
+    Parameters:
+        members (list[str]): the list of countries in the group
+        edges (list): The list of the edges as tuples (u, v, w), where u and v are the nodes and w is the weight of the edge
+        edge_colors (list[str]): The list of colors of the edges
+        edge_thickness (list[float]): The list of thickness of the edges
+        title (str): The title to be used in the graph
+    """
+    G = nx.Graph()
+    G.add_nodes_from(members)
+    for edge in edges:
+        G.add_edge(edge[0], edge[1], weight=round(edge[2], 3))
+    
+    plt.figure(figsize=(12,12))
+    if title is not None:
+        plt.title(title)
+    
+    pos = nx.spring_layout(G)
+    nx.draw(
+        G, 
+        pos, 
+        with_labels=True, 
+        node_color='gold', 
+        width=edge_thickness,
+        node_size=800,
+        edge_color=edge_colors    
+    )
+    edge_labels = nx.get_edge_attributes(G, 'weight')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
     plt.tight_layout()
     plt.show()

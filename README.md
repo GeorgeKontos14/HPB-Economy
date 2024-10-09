@@ -50,7 +50,7 @@ Three different types of similarity matrices where used: $k$-neighbors graph  an
 
 #### [Partitional Clustering](/partitional_clustering.ipynb)
 
-Literature has shown that several popular partitional algorithms can be adjusted to work better with time series by leveraging the concept of [dynamic time warping](https://rtavenar.github.io/blog/dtw.html) and all the related structures and algorithms (DTW Barycenter Averaging, Global Alignment Kernels, etc.). In this work, five such algorithms are tested: traditional $k$-Means (using Euclidean Distance), $k$-Means using DTW distance, [$k$-Shapes](https://sigmodrecord.org/publications/sigmodRecord/1603/pdfs/18_kShape_RH_Paparrizos.pdf), [$k$-Medoids](https://wis.kuleuven.be/stat/robust/papers/publications-1987/kaufmanrousseeuw-clusteringbymedoids-l1norm-1987.pdf) using DTW distance and [kernel $k$-Means](https://www.cs.utexas.edu/~inderjit/public_papers/kdd_spectral_kernelkmeans.pdf) using the Global Alignment Kernel (GAK) as a kernel function. In order to determine which algorithm is optimal and with which number of clusters, the elbow heuristic was used. Only the annual GDP per capita data was considered.
+Literature has shown that several popular partitional algorithms can be adjusted to work better with time series by leveraging the concept of [dynamic time warping](https://rtavenar.github.io/blog/dtw.html) and all the related structures and algorithms (DTW Barycenter Averaging, Global Alignment Kernels, etc.). In this work, five such algorithms are tested: traditional $k$-Means (using Euclidean Distance), $k$-Means using DTW distance, [k-Shapes](https://sigmodrecord.org/publications/sigmodRecord/1603/pdfs/18_kShape_RH_Paparrizos.pdf), [k-Medoids](https://wis.kuleuven.be/stat/robust/papers/publications-1987/kaufmanrousseeuw-clusteringbymedoids-l1norm-1987.pdf) using DTW distance and [kernel k-Means](https://www.cs.utexas.edu/~inderjit/public_papers/kdd_spectral_kernelkmeans.pdf) using the Global Alignment Kernel (GAK) as a kernel function. In order to determine which algorithm is optimal and with which number of clusters, the elbow heuristic was used. Only the annual GDP per capita data was considered.
 
 ![Elbow Plot](/Images/Clustering/Partitional/elbow_plot.png)
 
@@ -61,6 +61,10 @@ $4$-Means and $4$-Medoids using DTW perform the best, achieveing nearly identica
 
 ![4-Medoids with DTW](/Images/Clustering/Partitional/4_medoids_full.png)
 ![4-Medoids with DTW (map)](/Images/Clustering/Partitional/4_medoids_map.png)
+
+For $4$-Means with DTW, the following graph displays an example of information for countries that belong to groups that arise from geography (e.g. Europe), alliances (e.g. Former Soviet Block), the spoken language (e.g. Anglo-Saxon countries) or other characteristics (e.g. Island nations) and how this is reflected by the clustering algorithms. The weight of the edges is the DTW distance of their GDP time series, the color of the edge indicates whether they belong to the same cluster and the thickness indicates their geographical distance. 
+
+![Former Soviet Block](/Images/Clustering/Partitional/4_means_soviet_block.png)
 
 #### Conclusion
 
@@ -99,6 +103,7 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 - [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clusters
 - [SpectralClustering.py](/Clustering/SpectralClustering.py): Functionality for tuning and implementing the different spectral clustering algorithms
 - [TimeSeriesPartitioning.py](/Clustering/TimeSeriesPartitions.py): Functionality for implementing partitioning algorithms specifically designed for time series clustering
+- [PostProcessing.py](/Clustering/PostProcessing.py): Functionality for processing the results of clustering algorithms.
 
 ### Utilities
 

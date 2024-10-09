@@ -66,3 +66,48 @@ def load_clustering_data(
     world = gp.read_file(map_path)
 
     return names, gdp, pop, currency, world
+
+def load_locations(
+        n: int,
+        locations_path: str    
+    ) -> np.ndarray:
+    """
+    Loads the locations of the countries
+
+    Parameters:
+        n (int): The number of countries in the dataset
+        locations_path (str): The path to the csv file containing the locations
+    
+    Returns:
+        np.ndarray: The (longitude, latitude) matrix of all locations
+    """
+    locations = np.zeros((n,2))
+
+    with open(locations_path, 'r') as file:
+        rows = csv.reader(file)
+        for i,row in enumerate(rows):
+            for j,val in enumerate(row):
+                locations[i][j] = val
+
+    return locations
+
+def load_groups(groups_path: str) -> list:
+    """
+    Loads the country groups used for post-processing
+
+    Parameters:
+        groups_path (str): The path to the .txt file containing group information
+    
+    Returns:
+        list: The list of tuples (name, members), where name is a string and members is a list of ISO3 country codes
+    """
+    groups = []
+
+    with open(groups_path, 'r') as file:
+        rows = file.readlines()
+        row_no = 0
+        while row_no < len(rows)-1:
+            groups.append((rows[row_no][:-1], rows[row_no+1][:-1].split(',')))
+            row_no += 2
+        
+    return groups
