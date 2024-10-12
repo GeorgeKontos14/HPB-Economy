@@ -111,3 +111,37 @@ def load_groups(groups_path: str) -> list:
             row_no += 2
         
     return groups
+
+def load_forecast_data(
+        names_path: str,
+        gdp_path: str,
+        n: int,
+        T_gdp: int,
+    ):
+    """
+    Loads all data required for neural network regression from .csv and .txt files
+
+    Parameters:
+        names_path (str): The path to the file containing each country's ISO3 code
+        gdp_path (str): The path to the file containing each country's GDP data
+        n (int): The number of countries in the dataset
+        T_gdp (int): The amount of years GDP data is available for (ending in 2017)
+
+    Returns:
+        list[str]: The list of ISO3 codes for each country in the dataset
+        np.ndarray: The annual GDP per capita data for each country
+    """
+    names = []
+    with open(names_path, 'r') as file:
+        rows = file.readlines()
+        for row in rows:
+            names.append(row[:3])
+
+    gdp = np.zeros((n,T_gdp))
+    with open(gdp_path, 'r') as file:
+        rows = csv.reader(file)
+        for i, row in enumerate(rows):
+            for j, val in enumerate(row):
+                gdp[j][i] = float(val)
+
+    return names, gdp

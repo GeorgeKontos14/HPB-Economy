@@ -46,25 +46,23 @@ Spectral Clustering was performed in both the original and augmented dataset, wi
 
 Three different types of similarity matrices where used: $k$-neighbors graph  and $\epsilon$-neighborhood with Euclidean Distance Measure, as well as a $k$-neighbors graph with DTW as a dissimilarity measure. The versions using Euclidean Distance suggest heavy imbalance of the clusters; in fact, the $\epsilon$-neighborhood version splits the data in 19 different clusters, with 18 of them having no more than 6 countries each, and one of them having 66 countries. Even though the version using DTW provides the most balanced result and achieves the best silhouette score of the three algorithms, its clusters lack withing group similarity. This becomes even clearer when observing the (explicitely calculated) centroids.
 
-![Spectral Clusterin](/Images/Clustering/Spectral/spectral_clusters_plot.png)
-
 #### [Partitional Clustering](/partitional_clustering.ipynb)
 
 Literature has shown that several popular partitional algorithms can be adjusted to work better with time series by leveraging the concept of [dynamic time warping](https://rtavenar.github.io/blog/dtw.html) and all the related structures and algorithms (DTW Barycenter Averaging, Global Alignment Kernels, etc.). In this work, five such algorithms are tested: traditional $k$-Means (using Euclidean Distance), $k$-Means using DTW distance, [k-Shapes](https://sigmodrecord.org/publications/sigmodRecord/1603/pdfs/18_kShape_RH_Paparrizos.pdf), [k-Medoids](https://wis.kuleuven.be/stat/robust/papers/publications-1987/kaufmanrousseeuw-clusteringbymedoids-l1norm-1987.pdf) using DTW distance and [kernel k-Means](https://www.cs.utexas.edu/~inderjit/public_papers/kdd_spectral_kernelkmeans.pdf) using the Global Alignment Kernel (GAK) as a kernel function. In order to determine which algorithm is optimal and with which number of clusters, the elbow heuristic was used. Only the annual GDP per capita data was considered.
 
 ![Elbow Plot](/Images/Clustering/Partitional/elbow_plot.png)
 
-$4$-Means and $4$-Medoids using DTW perform the best, achieveing nearly identical results. They form well-structured clusters with mostly similar time-series shape and time-series. For each of the two algorithms, the clusters and their visualization on the world map are shown below. Countries that are not included in the dataset are also omitted from the map. Generally, all 5 partitional algorithms, when used with 3-5 clusters, significantly outperform hierarchical and spectral approaches in terms of silhouette score. 
+Kernel $6$-Means using GAK performs the best, very well structured clusters. Furthermore, utilizing spectral clustering for the initialization of the algorithm further improves these findings. For each of the two algorithms, the clusters and their visualization on the world map are shown below. Countries that are not included in the dataset are also omitted from the map. Generally, all 5 partitional algorithms, when used with 4-6 clusters, significantly outperform hierarchical and spectral approaches in terms of silhouette score and cluster cohesion. 
 
-![4-Means with DTW](/Images/Clustering/Partitional/4_means_full.png)
-![4-Means with DTW (map)](/Images/Clustering/Partitional/4_means_map.png)
+![Kernel 6-Means with GAK](/Images/Clustering/Partitional/kernel_kmeans_plots.png)
+![Kernel 6-Means with GAK (map)](/Images/Clustering/Partitional/kernel_kmeans_map.png)
 
-![4-Medoids with DTW](/Images/Clustering/Partitional/4_medoids_full.png)
-![4-Medoids with DTW (map)](/Images/Clustering/Partitional/4_medoids_map.png)
+![Kernel 6-Means with GAK and nonrandom initialization](/Images/Clustering/Partitional/kernel_kmeans_spec_plots.png)
+![Kernel 6-Means with GAK and nonrandom initialization (map)](/Images/Clustering/Partitional/kernel_kmeans_spec_map.png)
 
-For $4$-Means with DTW, the following graph displays an example of information for countries that belong to groups that arise from geography (e.g. Europe), alliances (e.g. Former Soviet Block), the spoken language (e.g. Anglo-Saxon countries) or other characteristics (e.g. Island nations) and how this is reflected by the clustering algorithms. The weight of the edges is the DTW distance of their GDP time series, the color of the edge indicates whether they belong to the same cluster and the thickness indicates their geographical distance. 
+The following graph displays an example of information for countries that belong to groups that arise from geography (e.g. Europe), alliances (e.g. Former Soviet Block), the spoken language (e.g. Anglo-Saxon countries) or other characteristics (e.g. Island nations) and how this is reflected by the clustering algorithms. The weight of the edges is the DTW distance of their GDP time series, the color of the edge indicates whether they belong to the same cluster and the thickness indicates their geographical distance. 
 
-![Former Soviet Block](/Images/Clustering/Partitional/4_means_soviet_block.png)
+![Former Soviet Block](/Images/Clustering/Partitional/soviet_block.png)
 
 #### Conclusion
 
@@ -76,37 +74,37 @@ Based on these results, we can conclude that the order of performance of the thr
 
 Jupyter notebooks in the home directory document different algorithms and experiments followed in this project. Specifically:
 - [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
+- [neural_networks.ipynb](/neuralnetworks.ipynb): Provides a detailed explenation of how neuralnetworks are tuned and used for iterative forecasting
+- [partitional_clustering.ipynb](/partitional_clustering.ipynb): Provides a detailed process for finding the best partioning approaches to time series clustering.
 - [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task
-- [timeseries_clustering.ipynb](/partitional_clustering.ipynb): Provides a detailed process for finding the best partioning approaches to time series clustering.
-- [neuralnetworks.ipynb](/neuralnetworks.ipynb): Provides a detailed explenation of how neuralnetworks are tuned and used for iterative forecasting
-- [pipeline.ipynb](/pipeline.ipynb): Demonstrates the final pipeline used for making country clustering, GDP predictions, and comparisons to previous work
 
 ### Replication of Previous Work
 
 The [SCC_Replication](/SCC_Replication) directory contains a Python implementation of the Gibbs Sampler described by Ulrich K. Muller, James H. Stock and Mark W. Watson in their work [An Econometric Model of International Growth Dynamics for Long-horizon Forecasting](https://direct.mit.edu/rest/article/104/5/857/97738/An-Econometric-Model-of-International-Growth),as well as a documentation of the previous Fortran90 implementation. A Markov Chain Monte Carlo algorithm is used to estimate the distribution of specific parameters of the cross-country linear econometric model they describe.
 
-### Neural Networks
-
-The [NeuralNetworks](/NeuralNetworks) directory contains all the necessary modules for performing iterative predictions with Multi-Layer Perceptrons and Recurrent Neural Networks. Specifically:
-- [LearningInstance.py](/NeuralNetworks/LearningInstance.py): A data structure that contains all the required data for training and testing a neural network for a specified country
-- [PreProcessing.py](/NeuralNetworks/PreProcessing.py): All the data pre-processing functions required to construct a `LearningInstance` object for each country
-- [ConstructModels.py](/NeuralNetworks/ConstructModels.py): Functions for constructing neural networks of selected specifications. These functions are required for automating the Bayesian Optimization tuning of the neural networks
-- [FineTuning.py](/NeuralNetworks/FineTuning.py): Functions that tune the number of layers and the number of neurons per layer for the neural networks. Tuning is performed through Bayesian Optimization
-- [Predictions.py](/NeuralNetworks/Predictions.py): Functions that perform iterative predictions for the different types of neural networks
-- [PostProcessing.py](/NeuralNetworks/PostProcessing.py): Functions for visualizing the testing and predictions
-
 ### Clustering
 
 The [Clustering](/Clustering) directory contains all the necessary modules for clustering the countries using hierarchical, spectral and partitional clustering. Specifically:
-- [PreProcessing.py](/Clustering/PreProcessing.py): The pre-processing functions required to construct the final dataset
-- [Outliers.py](/Clustering/Outliers.py): Functions for outlier detection through clustering, using the DBSCAN algorithm
 - [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clusters
+- [KernelKMeans.py](/Clustering/KernelKMeans.py): Adaptation of [tslearn](https://tslearn.readthedocs.io/en/stable/gen_modules/clustering/tslearn.clustering.KernelKMeans.html#tslearn.clustering.KernelKMeans)'s implementation of `KernelKMeans` to allow nonrandom initialization.
+- [Outliers.py](/Clustering/Outliers.py): Functions for outlier detection through clustering, using the DBSCAN algorithm
 - [SpectralClustering.py](/Clustering/SpectralClustering.py): Functionality for tuning and implementing the different spectral clustering algorithms
 - [TimeSeriesPartitioning.py](/Clustering/TimeSeriesPartitions.py): Functionality for implementing partitioning algorithms specifically designed for time series clustering
-- [PostProcessing.py](/Clustering/PostProcessing.py): Functionality for processing the results of clustering algorithms.
+
+### Neural Networks
+
+The [NeuralNetworks](/NeuralNetworks) directory contains all the necessary modules for performing iterative predictions with Multi-Layer Perceptrons and Recurrent Neural Networks. Specifically:
+- [ConstructModels.py](/NeuralNetworks/ConstructModels.py): Functions for constructing neural networks of selected specifications. These functions are required for automating the Bayesian Optimization tuning of the neural networks
+- [FineTuning.py](/NeuralNetworks/FineTuning.py): Functions that tune the number of layers and the number of neurons per layer for the neural networks. Tuning is performed through Bayesian Optimization
+- [LearningInstance.py](/NeuralNetworks/LearningInstance.py): A data structure that contains all the required data for training and testing a neural network for a specified country
+- [PostProcessing.py](/NeuralNetworks/PostProcessing.py): Functions for visualizing the testing and predictions
+- [Predictions.py](/NeuralNetworks/Predictions.py): Functions that perform iterative predictions for the different types of neural networks
+- [PreProcessing.py](/NeuralNetworks/PreProcessing.py): All the data pre-processing functions required to construct a `LearningInstance` object for each country
 
 ### Utilities
 
-- [DataUtils.py](/Utils/DataUtils.py): Utility functions for reading and writing data to files.
-- [VisualUtils.py](/Utils/VisualUtils.py): Utility functions for visualizing results
+- [DataUtils.py](/Utils/DataUtils.py): Utility functions for rea- [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clustersding and writing data to files.
+- [PostProcessing.py](/Clustering/PostProcessing.py): Functionality for processing the results of all algorithms.
+- [PreProcessing.py](/Clustering/PreProcessing.py): The pre-processing functions required to construct the final dataset for all algorithms
 - [TimeSeriesUtilities.py](/Utils/TimeSeriesUtils.py): Utility functions for time series processing
+- [VisualUtils.py](/Utils/VisualUtils.py): Utility functions for visualizing results
