@@ -145,3 +145,35 @@ def load_forecast_data(
                 gdp[j][i] = float(val)
 
     return names, gdp
+
+def write_data(data: np.ndarray, path: str):
+    """
+    Saves data to the specified file
+
+    Parameters:
+        data (np.ndarray): The data to be written
+        path (str): The file to which data should be written to
+    """
+    with open(path, 'w', newline='') as file: 
+        writer = csv.writer(file)
+        writer.writerows(data)
+
+def write_labels(
+        countries: list[str], 
+        labels: np.ndarray, 
+        path: str
+    ):
+    """
+    Writes the results of a clustering algorithm to a file.
+
+    Parameters:
+        countries (list[str]): The list containing the ISO-3 codes of all the countries that are clustered
+        labels (np.ndarray): The numpy array containing the labels that the algorithm outputed
+        path (str): The file to which data should be written to 
+    """
+    rows = [['Country', 'Cluster']]
+    for i, country in enumerate(countries):
+        rows.append([country, labels[i]])
+    with open(path, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(rows)

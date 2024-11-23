@@ -1,12 +1,10 @@
-# Investigation of Machine Learning approaches for long-horizon forecasting of international financial growth dynamics
+# Machine Learning Approaches for Clustering and Forecasting GDP Growth
 
 This research project is being carried out by Geroge Kontos, an Honours Student of the Honours Programme Bachelor of TU Delft. The research is being conducted under the supervision of Dr. N. Parolya.
 
 ## Abstract
 
 This project aims to investigate the effectiveness of machine learning approaches for long-horizon forecasting of international financial growth. This project uses the predictions published by Dr. U.K. Mueller, Dr. J.H.Stock and Dr. Mark. W. Watson in their work [An Econometric Model of International Growth Dynamics for Long-horizon Forecasting](https://direct.mit.edu/rest/article/104/5/857/97738/An-Econometric-Model-of-International-Growth) as a baseline for evaluation and comparisons of the foundings of machine learning models.
-
-To the end of providing high quality predictions, two types of machine learning algorithms are being used; clustering algorithms and regressive neural network. Clustering allows grouping the GDP growth of different countries that present similar characteristics together. Afterwards, regressive neural networks can be tuned to perform iterative predictions on the GDP data of each country. Tuning one neural network per cluster significantly increases the computational effeciency.
 
 ## Process and Findings
 
@@ -57,12 +55,19 @@ Kernel $6$-Means using GAK performs the best, very well structured clusters. Fur
 ![Kernel 6-Means with GAK](/Images/Clustering/Partitional/kernel_kmeans_plots.png)
 ![Kernel 6-Means with GAK (map)](/Images/Clustering/Partitional/kernel_kmeans_map.png)
 
-![Kernel 6-Means with GAK and nonrandom initialization](/Images/Clustering/Partitional/kernel_kmeans_spec_plots.png)
-![Kernel 6-Means with GAK and nonrandom initialization (map)](/Images/Clustering/Partitional/kernel_kmeans_spec_map.png)
+![Kernel 6-Means with GAK and spectral initialization](/Images/Clustering/Partitional/kernel_kmeans_spec_plots.png)
+![Kernel 6-Means with GAK and spectral initialization (map)](/Images/Clustering/Partitional/kernel_kmeans_spec_map.png)
 
 The following graph displays an example of information for countries that belong to groups that arise from geography (e.g. Europe), alliances (e.g. Former Soviet Block), the spoken language (e.g. Anglo-Saxon countries) or other characteristics (e.g. Island nations) and how this is reflected by the clustering algorithms. The weight of the edges is the DTW distance of their GDP time series, the color of the edge indicates whether they belong to the same cluster and the thickness indicates their geographical distance. 
 
 ![Former Soviet Block](/Images/Clustering/Partitional/soviet_block.png)
+
+#### [Clustering on Non-zero mean data](/unscaled_clustering.ipynb)
+
+In order to capture the magnitude difference of different countries, the same experiment is performed with a reduced pre-processing pipeline: The logarithm of each time series is adjusted to have unit variance, but its mean remains unchanged. The best performing algorithm in this case was Kernel $13$-Means, providing very well structured clusters and capturing geographical relations better than any other algorithm. The results are indicated by the two following figures.
+
+![Kernel 13-Means with GAK and non-zero mean input](/Images/Clustering/Partitional/kernel_13plots.png)
+![Kernel 13-Means with GAK and non-zero mean input (map)](/Images/Clustering/Partitional/kernel_13map.png)
 
 #### Conclusion
 
@@ -76,7 +81,9 @@ Jupyter notebooks in the home directory document different algorithms and experi
 - [hierarchical_clustering.ipynb](/hierarchical_clustering.ipynb): Provides a detailed process for determining the optimal hierarchical clustering algorithm
 - [neural_networks.ipynb](/neuralnetworks.ipynb): Provides a detailed explenation of how neuralnetworks are tuned and used for iterative forecasting
 - [partitional_clustering.ipynb](/partitional_clustering.ipynb): Provides a detailed process for finding the best partioning approaches to time series clustering.
-- [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task
+- [prob_forecasting.ipynb](/prob_forecasting.ipynb): Performs probabilistic forecasting on the GDP growth
+- [spectral_clustering.ipynb](/spectral_clustering.ipynb): Provides a detailed process for examining the effectiveness of spectral clustering for the given task.
+- [unscaled_clustring.ipynb](/unscaled_clustering.ipynb): Performs partitional clustering on the non-zero mean time series
 
 ### Replication of Previous Work
 
@@ -90,6 +97,10 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 - [Outliers.py](/Clustering/Outliers.py): Functions for outlier detection through clustering, using the DBSCAN algorithm
 - [SpectralClustering.py](/Clustering/SpectralClustering.py): Functionality for tuning and implementing the different spectral clustering algorithms
 - [TimeSeriesPartitioning.py](/Clustering/TimeSeriesPartitions.py): Functionality for implementing partitioning algorithms specifically designed for time series clustering
+
+### Forecasting
+The [Forecasting](/Forecasting/) directory contains all the nesessary functionality for performing univariate and multivariate probabilistic forecasts. Specifically:
+- [UnivariateForecasts.py](/Forecasting/UnivariateForecasts.py): Functions for univariate recursive probabilistic forecasts.
 
 ### Neural Networks
 

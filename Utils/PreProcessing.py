@@ -122,7 +122,8 @@ def preprocess_onlyGDP(
         countries: list[str],
         gdp: np.ndarray, 
         start_year: int,
-        T: int
+        T: int,
+        zero_mean: bool = True
     ):
     """
     Constructs the final dataset to be used for the clustering algorithm only considering the GDP per capita time series
@@ -132,6 +133,7 @@ def preprocess_onlyGDP(
         gdp (np.ndarray): The matrix containing the annual GDP per capita for each country
         start_year (int): The start year of the data
         T (int): The amount of years for which data is collected
+        zero_mean (bool): Whether or not to change the time series mean to zero
 
     Returns:
         pd.DataFrame: The dataset
@@ -142,6 +144,8 @@ def preprocess_onlyGDP(
     df = pd.DataFrame({start_year+i: gdp[:, i] for i in range(T)})
     df.index = countries
     scaled_data = np.squeeze(scaler.fit_transform(df))
+    if not zero_mean:
+        scaled_data += np.mean(gdp, axis=1)[:, np.newaxis]
     scaled_df = pd.DataFrame(scaled_data, columns=df.columns, index=df.index)
 
     return df, scaled_df, scaled_data

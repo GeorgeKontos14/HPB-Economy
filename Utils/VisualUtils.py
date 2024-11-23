@@ -88,7 +88,8 @@ def plot_clusters(
         plt.subplot(rows, columns, yi+1)
         for xx in data[labels == yi]:
             plt.plot(time, xx.ravel(), 'k-', alpha=.2)
-        plt.plot(time, cluster_centers[yi].ravel(), 'lime')
+        if cluster_centers is not None:
+            plt.plot(time, cluster_centers[yi].ravel(), 'lime')
         plt.text(0.55, 0.85, f'Cluster {yi+1}',
                 transform=plt.gca().transAxes)
 
@@ -268,3 +269,83 @@ def plot_group_graph(
 
     plt.tight_layout()
     plt.show()
+
+def plot_arima_orders(arima_orders: np.ndarray):
+    """
+    Plots a summary of the ARIMA orders for multiple time series
+
+    Parameters:
+        arima_orders (np.ndarray): The (n,3) array (n: # time series), where each row is the (p,d,q) ARIMA orders
+    """
+
+    unique_values = np.unique(arima_orders)
+
+    cols = ['Autoregression Order', 'Differentiation Order', 'Moving Average Order']
+    colors = ['orange', 'purple', 'teal']
+
+    counts = {value: [np.sum(arima_orders[:, col] == value) for col in range(
+        arima_orders.shape[1])] for value in unique_values}
+
+    x = np.arange(len(unique_values))
+    bar_width = 0.25
+
+    for i in range(arima_orders.shape[1]):
+        counts_per_column = [counts[value][i] for value in unique_values]
+        plt.bar(x + i * bar_width, counts_per_column, 
+            width=bar_width, label=cols[i], color=colors[i])
+    
+    plt.xticks(x + bar_width * (arima_orders.shape[1] - 1) / 2, unique_values)
+    plt.xlabel("Values")
+    plt.ylabel("Frequency")
+    plt.title("Frequency of Values in Each Column")
+    plt.legend()
+    plt.show()    
+
+def plot_forecast_intervals(
+        data_train: pd.Series,
+        data_test: pd.Series,
+        country: str,
+        test_predictions: pd.DataFrame,
+        oos_predictions: pd.DataFrame,
+        alpha:float
+    ):
+    """
+    Plots the probabilistic forecast for a given country
+
+    Parameters:
+        data_train (pd.Series): The training part of the GDP time series
+        data_test (pd.Series): The testing_part of the GDP time series
+        country (str): The name of the country
+        test_predictions (pd.DataFrame): The prediction intervals on the test set
+        oos_predictions (pd.DataFrame): The out-of-sample (horizon) prediction intervals
+        alpha (float): The percentage of the prediction intervals 
+    """
+    mean_bounds = pd.Series((oos_predictions[
+        'lower_bound']+oos_predictions['upper_bound'])/2, index=oos_predictions.index)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    ax.set_title(country)
+
+    data_train.plot(ax=ax, label='Train', color='b')
+    data_test.plot(ax=ax, label="Test", color='g')
+
+    ax.fill_between(
+        test_predictions.index,
+        test_predictions['lower_bound'],
+        test_predictions['upper_bound'],
+        color = 'coral',
+        alpha = 0.3,
+        label = f'{alpha}% interval (in sample)'
+    )
+
+    mean_bounds.plot(ax=ax, alpha=0, label='_nonlegend_')
+
+    ax.fill_between(
+        oos_predictions.index,
+        oos_predictions['lower_bound'],
+        oos_predictions['upper_bound'],
+        color = 'coral',
+        alpha = 0.8,
+        label = f'{alpha}% interval (out of sample)'
+    )
