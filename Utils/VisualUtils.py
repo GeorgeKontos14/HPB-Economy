@@ -297,7 +297,7 @@ def plot_arima_orders(arima_orders: np.ndarray):
     plt.xticks(x + bar_width * (arima_orders.shape[1] - 1) / 2, unique_values)
     plt.xlabel("Values")
     plt.ylabel("Frequency")
-    plt.title("Frequency of Values in Each Column")
+    plt.title("Frequency of Values")
     plt.legend()
     plt.show()    
 
@@ -349,3 +349,5 @@ def plot_forecast_intervals(
         alpha = 0.8,
         label = f'{alpha}% interval (out of sample)'
     )
+
+    ax.legend()

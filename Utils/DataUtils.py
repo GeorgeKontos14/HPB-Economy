@@ -1,5 +1,7 @@
 import numpy as np
 
+import pandas as pd
+
 import csv
 
 import geopandas as gp
@@ -146,6 +148,26 @@ def load_forecast_data(
 
     return names, gdp
 
+def load_labels(path: str) -> np.ndarray:
+    """
+    Loads the labels produced from clustering
+
+    Parameters:
+        path (str): The path to the .csv file containing the labels
+    
+    Returns:
+        np.ndarray: The numpy array containing the labels
+    """
+    labels = []
+    with open(path, 'r') as file:
+        rows = csv.reader(file)
+        for i, row in enumerate(rows):
+            if i > 0:
+                labels.append(int(row[1]))
+    
+    return np.array(labels)
+
+
 def write_data(data: np.ndarray, path: str):
     """
     Saves data to the specified file
@@ -177,3 +199,30 @@ def write_labels(
     with open(path, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerows(rows)
+
+def select_predictions(
+        country: str, 
+        predictions: pd.DataFrame
+    ) -> pd.DataFrame:
+    """
+    Select and isolate the predictions of a specified country
+
+    Parameters:
+        country (str): The ISO-3 code of the specified country
+        predictions (pd.DataFrame): The object containing predictions for multiple countries
+
+    Returns:
+        pd.DataFrame: The predictions for the selected country 
+    """
+
+    new_cols = {
+        country: country,
+        f'{country}_lower_bound':'lower_bound',
+        f'{country}_upper_bound':'upper_bound'
+    }
+
+    selected_preds = predictions[[
+        country,f'{country}_lower_bound', f'{country}_upper_bound'
+    ]].rename(columns=new_cols)
+
+    return selected_preds

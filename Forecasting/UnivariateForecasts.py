@@ -5,7 +5,8 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 
 from skforecast.preprocessing import RollingFeatures
-from skforecast.recursive import ForecasterRecursive
+from skforecast.recursive import ForecasterRecursive, ForecasterSarimax
+from skforecast.sarimax import Sarimax
 
 def univariate_forecast(
         y: np.ndarray,
@@ -14,7 +15,8 @@ def univariate_forecast(
         start_year: int,
         horizon: int,
         lower_quantile: float,
-        upper_quantile: float
+        upper_quantile: float,
+        use_gbr: float = True
     ):
     """
     Performs probabilistic forecasting on a single univariate time series, using Gradient Boosting
@@ -27,6 +29,7 @@ def univariate_forecast(
         horizon (int): The number of future values to be predicted
         lower_quantile (float): The lower bound quantile to be predicted
         upper_quantile (float): The upper bound quantile to be predicted
+        use_gbr (float): Indicates what model should be used. (True for GBR, False for ARIMA)
 
     Returns:
         pd.Series: The indexed training set
@@ -50,31 +53,42 @@ def univariate_forecast(
     data_test = pd.Series(y[split_ind:], index=T_test)
     data_all = pd.Series(y, index=T_all)
 
-    lags = None
-    window_features = None
-    differentiation = None
-    if p >= 1:
-        lags = p
-    if q >= 1:
-        window_features = RollingFeatures(stats=['mean'], window_sizes=q)
-    if d >= 1:
-        differentiation = d
-    if lags is None and window_features is None:
-        lags=1
+    if use_gbr:
+        lags = None
+        window_features = None
+        differentiation = None
+        if p >= 1:
+            lags = p
+        if q >= 1:
+            window_features = RollingFeatures(stats=['mean'], window_sizes=q)
+        if d >= 1:
+            differentiation = d
+        if lags is None and window_features is None:
+            lags=1
 
-    forecaster = ForecasterRecursive(
-        regressor = GradientBoostingRegressor(loss='quantile'),
-        lags = lags,
-        window_features = window_features,
-        differentiation=differentiation
-    )
+        forecaster = ForecasterRecursive(
+            regressor = GradientBoostingRegressor(loss='quantile'),
+            lags = lags,
+            window_features = window_features,
+            differentiation=differentiation
+        )
+    else:
+        forecaster = ForecasterSarimax(regressor = Sarimax(order=(p,d,q)))
 
     forecaster.fit(y=data_train)
-    test_preds = forecaster.predict_interval(steps=test_steps, interval=[
-        lower_quantile, upper_quantile], n_boot=100)
+    if use_gbr:
+        test_preds = forecaster.predict_interval(steps=test_steps, interval=[
+            lower_quantile, upper_quantile], n_boot=100)
+    else:
+        test_preds = forecaster.predict_interval(steps=test_steps, interval=[
+            lower_quantile, upper_quantile])
 
     forecaster.fit(y=data_all)
-    horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
-        lower_quantile, upper_quantile], n_boot=100)
-    
+    if use_gbr:
+        horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
+            lower_quantile, upper_quantile], n_boot=100)
+    else:
+        horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
+            lower_quantile, upper_quantile])
+        
     return data_train, data_test, test_preds, horizon_preds

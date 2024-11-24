@@ -73,6 +73,41 @@ In order to capture the magnitude difference of different countries, the same ex
 
 Based on these results, we can conclude that the order of performance of the three approaches is clear; hierarchical clustering performs the worst, while partitional clustering performs the best. For the remainder of this project, the $4$-Means algorithm using DTW will be preferred over the $4$-Medoids version, because $k$-Medoids only considers input data as possible centroids, which, while robust to outliers, might not be optimal in representing the majority of the data within a cluster.
 
+### [Forecasting](/prob_forecasting.ipynb)
+
+In order to develop an understanding of the future values of the GDP growth of each country, probabilistic forecasts are utilized. Probabilistic forecasting is prefered over point forecasting, as it provides intel about the ranges within the future values are most likely to fall and the model's confidence. This approach works better than point forecasting when a very limited amount of data is available, which is the case in this situation.
+
+Throughout the experiments, Gradient Boosting Regressors are used to optimize the predictions. Univariate and independent multi-series predictions are performed recursively, while multivariate predictions are performed directly, both using `skforecast`'s framework.
+
+For these forecasts, three different hyperparameters shall be predetermined before training and testing the forecast:
+- `lags`: The number of previous values to be considered for the prediction of the next value.
+- `window_size`: The size of the window over which additional statistics are calculated.
+- `differentiation`: The number of times the time series shall be differenced
+
+One can easily observe that these hyperparameters resemble the order tuple for an $ARIMA(p,d,q)$ process. For this reason, the parameters are determined by the optimal corresponding $(p,d,q)$ orders. In general, multivariate models allow different numbers of lags for each variable, but demand a unique order of differentiation and stats window size. The mode of the differentiation orders and moving average orders of the groups of countries considered is used.
+
+![Overview of ARIMA orders](/Images/Forecasts/arima_orders.png)
+
+#### Univariate Forecasting
+
+In the univariate forecasts, each time series is considered in isolation and a gradient boosting regressor is fitted to perform probabilistic predictions on the series in question. The figure below showcases the performance of such a model for the GDP evolution of Serbia, when the modeled is configured to calculate the $67\%$ prediction intervals.
+
+![Univariate forecast for Serbia (SRB)](/Images/Forecasts/univariate_srb.png)
+
+#### Independent Multi-Series Forecasting
+
+It is possible to perform imultaneous probabilistic recursive predictions for multiple time series, without considering cross-series dependencies. Modelling multiple time series together adds to the robustness of the model, epsecially under the lack of data for the specific experiment. First, we consider the entire dataset at once. Afterwards, we consider the clusters produced by the use of Kernel $13$-Means on the non-zero-mean unit-variance dataset in isolation. Once again, $67\%$ prediction intervals for Serbia are shown.
+
+![Independend multi-series forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/independent_all_srb.png)
+![Independend multi-series forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/independent_all_srb.png)
+
+#### Many-to-one Forecasting
+
+The framework developed from `skforecast` has functionality for performing direct predictions where the interdependence between different variables is considered. However, the framework is limited to perform predictions on only one variable, due to efficiency limitations. We utilize this functionality by creating a separate model for each country of interest. While this approach is not fully indicative of the joint GDP growth, it provides insight on how its individual GDP progression is affected by other countries.
+
+![Many-to-one forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/manytoone_all_srb.png)
+![Many-to-one forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/manytoone_cluster_srb.png)
+
 ## Directories and Modules
 
 ### Home Directory
@@ -101,16 +136,7 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 ### Forecasting
 The [Forecasting](/Forecasting/) directory contains all the nesessary functionality for performing univariate and multivariate probabilistic forecasts. Specifically:
 - [UnivariateForecasts.py](/Forecasting/UnivariateForecasts.py): Functions for univariate recursive probabilistic forecasts.
-
-### Neural Networks
-
-The [NeuralNetworks](/NeuralNetworks) directory contains all the necessary modules for performing iterative predictions with Multi-Layer Perceptrons and Recurrent Neural Networks. Specifically:
-- [ConstructModels.py](/NeuralNetworks/ConstructModels.py): Functions for constructing neural networks of selected specifications. These functions are required for automating the Bayesian Optimization tuning of the neural networks
-- [FineTuning.py](/NeuralNetworks/FineTuning.py): Functions that tune the number of layers and the number of neurons per layer for the neural networks. Tuning is performed through Bayesian Optimization
-- [LearningInstance.py](/NeuralNetworks/LearningInstance.py): A data structure that contains all the required data for training and testing a neural network for a specified country
-- [PostProcessing.py](/NeuralNetworks/PostProcessing.py): Functions for visualizing the testing and predictions
-- [Predictions.py](/NeuralNetworks/Predictions.py): Functions that perform iterative predictions for the different types of neural networks
-- [PreProcessing.py](/NeuralNetworks/PreProcessing.py): All the data pre-processing functions required to construct a `LearningInstance` object for each country
+- [MultivariarteForecasts.py](/Forecasting/MultivariateForecasts.py): Functions for multivariate (recursive & direct) probabilistic forecasts.
 
 ### Utilities
 
