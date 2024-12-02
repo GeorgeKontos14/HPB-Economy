@@ -320,8 +320,6 @@ def plot_forecast_intervals(
         oos_predictions (pd.DataFrame): The out-of-sample (horizon) prediction intervals
         alpha (float): The percentage of the prediction intervals 
     """
-    mean_bounds = pd.Series((oos_predictions[
-        'lower_bound']+oos_predictions['upper_bound'])/2, index=oos_predictions.index)
 
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -339,8 +337,9 @@ def plot_forecast_intervals(
         label = f'{alpha}% interval (in sample)'
     )
 
-    mean_bounds.plot(ax=ax, alpha=0, label='_nonlegend_')
-
+    test_predictions['median'].plot(ax=ax, color='r', label='Median')
+    oos_predictions['median'].plot(ax=ax, color='r', label='_nonlegend_')
+    
     ax.fill_between(
         oos_predictions.index,
         oos_predictions['lower_bound'],
@@ -349,5 +348,7 @@ def plot_forecast_intervals(
         alpha = 0.8,
         label = f'{alpha}% interval (out of sample)'
     )
+
+    
 
     ax.legend()

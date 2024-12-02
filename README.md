@@ -108,6 +108,13 @@ The framework developed from `skforecast` has functionality for performing direc
 ![Many-to-one forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/manytoone_all_srb.png)
 ![Many-to-one forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/manytoone_cluster_srb.png)
 
+#### Many-to-many Forecasting
+
+The `ForecastDirectMultiOutput` class adjusts the `skforecast` implementation of `ForecasterDirectMultiVariate` to make predictions on multiple levels. While this is considerably less efficient than the previous approach, it allows us to better capture cross-country dependencies. The `sklearn.multioutput.MultiOutputRegressor` wrapper is used to allow the use of Gradient Boosting Regression for multivariate predictions.
+
+![Many-to-many forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/manytomany_all_srb.png)
+![Many-to-many forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/manytomany_cluster_srb.png)
+
 ## Directories and Modules
 
 ### Home Directory
@@ -135,8 +142,9 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 
 ### Forecasting
 The [Forecasting](/Forecasting/) directory contains all the nesessary functionality for performing univariate and multivariate probabilistic forecasts. Specifically:
-- [UnivariateForecasts.py](/Forecasting/UnivariateForecasts.py): Functions for univariate recursive probabilistic forecasts.
+- [ForecasterMultioutput.py](/Forecasting/ForecasterMultioutput.py): Class that adjusts `skforecast.direct.ForecasterDirectMultivariate` to perform predictions on multiple time series at once
 - [MultivariarteForecasts.py](/Forecasting/MultivariateForecasts.py): Functions for multivariate (recursive & direct) probabilistic forecasts.
+- [UnivariateForecasts.py](/Forecasting/UnivariateForecasts.py): Functions for univariate recursive probabilistic forecasts.
 
 ### Utilities
 

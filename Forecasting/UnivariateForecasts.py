@@ -79,16 +79,29 @@ def univariate_forecast(
     if use_gbr:
         test_preds = forecaster.predict_interval(steps=test_steps, interval=[
             lower_quantile, upper_quantile], n_boot=100)
+        test_med = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
+        test_med.columns = ['median']
     else:
         test_preds = forecaster.predict_interval(steps=test_steps, interval=[
             lower_quantile, upper_quantile])
+        # not actual median; just for consistency
+        test_med = (test_preds['lower_bound']+test_preds['upper_bound'])/2
+        test_med.name = 'median'
+        test_med = pd.DataFrame(test_med)
+    test_preds = pd.concat([test_preds, test_med], axis=1)
 
     forecaster.fit(y=data_all)
     if use_gbr:
         horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
             lower_quantile, upper_quantile], n_boot=100)
+        horizon_med = forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
+        horizon_med.columns = ['median']
     else:
         horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
             lower_quantile, upper_quantile])
-        
+        horizon_med = (horizon_preds['lower_bound']+horizon_preds['upper_bound'])/2
+        horizon_med.name = 'median'
+        horizon_med = pd.DataFrame(horizon_med)
+    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+
     return data_train, data_test, test_preds, horizon_preds

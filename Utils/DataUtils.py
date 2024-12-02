@@ -218,11 +218,12 @@ def select_predictions(
     new_cols = {
         country: country,
         f'{country}_lower_bound':'lower_bound',
-        f'{country}_upper_bound':'upper_bound'
+        f'{country}_upper_bound':'upper_bound',
+        f'{country}_q_0.5': 'median'
     }
 
     selected_preds = predictions[[
-        country,f'{country}_lower_bound', f'{country}_upper_bound'
+        country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5'
     ]].rename(columns=new_cols)
 
     return selected_preds
