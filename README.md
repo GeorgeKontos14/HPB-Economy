@@ -115,6 +115,13 @@ The `ForecastDirectMultiOutput` class adjusts the `skforecast` implementation of
 ![Many-to-many forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/manytomany_all_srb.png)
 ![Many-to-many forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/manytomany_cluster_srb.png)
 
+#### Forecasting with Recurrent Neural Networks
+
+Contrary to the previous experiments where gradient boosting regression was used, this experiments uses recurrent neural networks as regressors. The `ForecastRNNProb` class adjusts the `skforecast` implementation of `ForecasterRNN` to support differentiation and perform prediction bootstrapping. Long Short-Term Memory cells are used as recurrent units.
+
+![RNN forecast for Serbia (SRB) considering the entire dataset](/Images/Forecasts/rnn_all_srb.png)
+![RNN forecast for Serbia (SRB) considering only its cluster (i.e. Iraq, Russia, Serbia, Venezuela)](/Images/Forecasts/rnn_cluster_srb.png)
+
 ## Directories and Modules
 
 ### Home Directory
@@ -142,7 +149,8 @@ The [Clustering](/Clustering) directory contains all the necessary modules for c
 
 ### Forecasting
 The [Forecasting](/Forecasting/) directory contains all the nesessary functionality for performing univariate and multivariate probabilistic forecasts. Specifically:
-- [ForecasterMultioutput.py](/Forecasting/ForecasterMultioutput.py): Class that adjusts `skforecast.direct.ForecasterDirectMultivariate` to perform predictions on multiple time series at once
+- [ForecasterMultioutput.py](/Forecasting/ForecasterMultioutput.py): Class that adjusts `skforecast.direct.ForecasterDirectMultivariate` to perform predictions on multiple time series at once.
+- [ForecasterRNNProb.py](/Forecasting/ForecasterRNNProb.py): Class that adjusts `skforecast.deep_learning.ForecasterRNN` to perform probabilistic predictions and support differentiation.
 - [MultivariarteForecasts.py](/Forecasting/MultivariateForecasts.py): Functions for multivariate (recursive & direct) probabilistic forecasts.
 - [UnivariateForecasts.py](/Forecasting/UnivariateForecasts.py): Functions for univariate recursive probabilistic forecasts.
 
