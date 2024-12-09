@@ -8,6 +8,8 @@ from skforecast.preprocessing import RollingFeatures
 from skforecast.recursive import ForecasterRecursive, ForecasterSarimax
 from skforecast.sarimax import Sarimax
 
+from Utils import ForecastingUtils
+
 def univariate_forecast(
         y: np.ndarray,
         arima_order: np.ndarray,
@@ -88,7 +90,13 @@ def univariate_forecast(
         test_med = (test_preds['lower_bound']+test_preds['upper_bound'])/2
         test_med.name = 'median'
         test_med = pd.DataFrame(test_med)
-    test_preds = pd.concat([test_preds, test_med], axis=1)
+
+    test_mean = ForecastingUtils.predict_mean(
+        forecaster=forecaster, to_predict=['NA'], horizon=test_steps, univariate=True
+    )
+    test_mean.columns = ['mean']
+
+    test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
 
     forecaster.fit(y=data_all)
     if use_gbr:
@@ -102,6 +110,12 @@ def univariate_forecast(
         horizon_med = (horizon_preds['lower_bound']+horizon_preds['upper_bound'])/2
         horizon_med.name = 'median'
         horizon_med = pd.DataFrame(horizon_med)
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+
+    horizon_mean = ForecastingUtils.predict_mean(
+        forecaster=forecaster, to_predict=['NA'], horizon=horizon, univariate=True
+    )
+    horizon_mean.columns = ['mean']
+
+    horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
 
     return data_train, data_test, test_preds, horizon_preds

@@ -18,7 +18,7 @@ from skforecast.deep_learning.utils import create_and_compile_model
 from Forecasting.ForecasterRNNProb import ForecastRNNProb
 from Forecasting.ForecasterMultioutput import ForecastDirectMultiOutput
 
-from Utils import DataUtils
+from Utils import ForecastingUtils
 
 def multiseries_independent_forecasts(
         y: np.ndarray,
@@ -80,13 +80,19 @@ def multiseries_independent_forecasts(
     test_preds = forecaster.predict_interval(steps=test_steps, interval=[
             lower_quantile, upper_quantile], n_boot=100)
     test_med = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-    test_preds = pd.concat([test_preds, test_med], axis=1)
+    test_mean = ForecastingUtils.predict_mean(
+        forecaster=forecaster, to_predict=countries, horizon=test_steps, univariate=False
+    )
+    test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
 
     forecaster.fit(series=data_all)
     horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
             lower_quantile, upper_quantile], n_boot=100)
     horizon_med = forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+    horizon_mean = ForecastingUtils.predict_mean(
+        forecaster=forecaster, to_predict=countries, horizon=horizon, univariate=False
+    )
+    horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
     
     return data_train, data_test, test_preds, horizon_preds
 
@@ -166,7 +172,10 @@ def many_to_one_forecasts(
             n_boot = 100
         )
         country_test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-        country_test_preds = pd.concat([country_test_preds, country_test_med], axis=1)
+        country_test_mean = ForecastingUtils.predict_mean(
+            forecaster = test_forecaster, to_predict=[country], horizon=test_steps, univariate=True
+        )
+        country_test_preds = pd.concat([country_test_preds, country_test_med, country_test_mean], axis=1)
 
         horizon_forecaster = ForecasterDirectMultiVariate(
             regressor=GradientBoostingRegressor(loss='quantile'),
@@ -183,7 +192,10 @@ def many_to_one_forecasts(
             n_boot = 100
         )
         country_horizon_med = horizon_forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
-        country_horizon_preds = pd.concat([country_horizon_preds, country_horizon_med], axis=1)
+        country_horizon_mean = ForecastingUtils.predict_mean(
+            forecaster=horizon_forecaster, to_predict=[country], horizon=horizon, univariate=True
+        )
+        country_horizon_preds = pd.concat([country_horizon_preds, country_horizon_med, country_horizon_mean], axis=1)
 
         test_preds = pd.concat([test_preds, country_test_preds], axis=1)
         horizon_preds = pd.concat([horizon_preds, country_horizon_preds], axis=1)
@@ -268,7 +280,10 @@ def many_to_many_forecasts(
     )
 
     test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-    test_preds = pd.concat([test_preds, test_med], axis=1)
+    test_mean = ForecastingUtils.predict_mean(
+        forecaster=test_forecaster, to_predict=to_predict, horizon=test_steps, univariate=False
+    )
+    test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
     
     horizon_forecaster = ForecastDirectMultiOutput(
         regressor = MultiOutputRegressor(
@@ -290,7 +305,10 @@ def many_to_many_forecasts(
     )
 
     horizon_med = horizon_forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+    horizon_mean = ForecastingUtils.predict_mean(
+        forecaster=horizon_forecaster, to_predict=to_predict, horizon=horizon, univariate=False
+    )
+    horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
 
     return data_train, data_test, test_preds, horizon_preds
 
@@ -416,7 +434,10 @@ def rnn_forecasts(
     )
 
     test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-    test_preds = pd.concat([test_preds, test_med], axis=1)
+    test_mean = ForecastingUtils.predict_mean(
+        forecaster=test_forecaster, to_predict=to_predict, horizon=test_steps, univariate=False
+    )
+    test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
 
     for col in test_preds.columns:
         country = col[:3]
@@ -440,7 +461,10 @@ def rnn_forecasts(
     )
 
     horizon_med = horizon_forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+    horizon_mean = ForecastingUtils.predict_mean(
+        forecaster=horizon_forecaster, to_predict=to_predict, horizon=horizon, univariate=False
+    )
+    horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
 
     for col in horizon_preds.columns:
         country = col[:3]

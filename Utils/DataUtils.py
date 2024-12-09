@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 
 import pandas as pd
@@ -167,6 +169,42 @@ def load_labels(path: str) -> np.ndarray:
     
     return np.array(labels)
 
+def load_forecast(
+        dir: str,
+        start_year: int,
+        T: int, 
+        train_split: float, 
+        horizon: int
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Loads forecasts from csv files
+
+    Parameters:
+        dir (str): The directory containing the csv files
+        start_year (int): The start year of observations
+        T (int): The number of observations
+        train_split (float): The train-test ratio
+        horizon (int): The number of future values to be predicted
+    
+    Returns:
+        pd.DataFrame: The predictions on the test set
+        pd.DataFrame: The predictions on the horizon
+    """
+
+    test_path = f'{dir}/test.csv'
+    horizon_path = f'{dir}/future.csv'
+    
+    test_preds = pd.read_csv(test_path)
+    horizon_preds = pd.read_csv(horizon_path)
+
+    split_ind = int(train_split*T)
+    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
+    T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
+
+    test_preds.index = T_test
+    horizon_preds.index = T_horizon
+
+    return test_preds, horizon_preds
 
 def write_data(data: np.ndarray, path: str):
     """
@@ -200,6 +238,24 @@ def write_labels(
         writer = csv.writer(file)
         writer.writerows(rows)
 
+def write_forecasts(
+        test_preds: pd.DataFrame,
+        horizon_preds: pd.DataFrame,
+        dir: str    
+    ):
+    """
+    Writes predictions for test and horizon in different files
+
+    Parameters:
+        test_preds (pd.DataFrame): The predictions on the test set
+        horizon_preds (pd.DataFrame): The future predictions
+        dir (str): The path to the directory to store the files
+    """
+    test_path = f"{dir}/test.csv"
+    horizon_path = f"{dir}/future.csv"
+    test_preds.to_csv(test_path, index=False)
+    horizon_preds.to_csv(horizon_path, index=False)
+
 def select_predictions(
         country: str, 
         predictions: pd.DataFrame
@@ -219,11 +275,12 @@ def select_predictions(
         country: country,
         f'{country}_lower_bound':'lower_bound',
         f'{country}_upper_bound':'upper_bound',
-        f'{country}_q_0.5': 'median'
+        f'{country}_q_0.5': 'median',
+        f'{country}_mean': 'mean'
     }
 
     selected_preds = predictions[[
-        country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5'
+        country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5', f'{country}_mean'
     ]].rename(columns=new_cols)
 
     return selected_preds

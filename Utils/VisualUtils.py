@@ -307,7 +307,10 @@ def plot_forecast_intervals(
         country: str,
         test_predictions: pd.DataFrame,
         oos_predictions: pd.DataFrame,
-        alpha:float
+        alpha:float,
+        ax = None,
+        title: str = None,
+        show_legend: bool = True
     ):
     """
     Plots the probabilistic forecast for a given country
@@ -319,26 +322,34 @@ def plot_forecast_intervals(
         test_predictions (pd.DataFrame): The prediction intervals on the test set
         oos_predictions (pd.DataFrame): The out-of-sample (horizon) prediction intervals
         alpha (float): The percentage of the prediction intervals 
+        ax: The object to be used for plotting
+        title (str): The title of the plot; if none, the name of the country
+        show_legend (bool): Whether or not to display a legend alongside the plot.
     """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    if title is None:
+        ax.set_title(country)
+    else:
+        ax.set_title(title)
 
-    ax.set_title(country)
-
-    data_train.plot(ax=ax, label='Train', color='b')
+    data_train.plot(ax=ax, label='Train', color='black')
     data_test.plot(ax=ax, label="Test", color='g')
 
     ax.fill_between(
         test_predictions.index,
         test_predictions['lower_bound'],
         test_predictions['upper_bound'],
-        color = 'coral',
+        color = 'lightskyblue',
         alpha = 0.3,
         label = f'{alpha}% interval (in sample)'
     )
 
     test_predictions['median'].plot(ax=ax, color='r', label='Median')
+    test_predictions['mean'].plot(ax=ax, color='blueviolet', label='Mean')
     oos_predictions['median'].plot(ax=ax, color='r', label='_nonlegend_')
+    oos_predictions['mean'].plot(ax=ax, color='blueviolet', label='_nonlegend_')
     
     ax.fill_between(
         oos_predictions.index,
@@ -349,6 +360,58 @@ def plot_forecast_intervals(
         label = f'{alpha}% interval (out of sample)'
     )
 
-    
+    if show_legend:
+        ax.legend()
 
-    ax.legend()
+def plot_many_predictions(
+        data_train: pd.DataFrame,
+        data_test: pd.DataFrame,
+        country: str,
+        test_predictions: list[pd.DataFrame],
+        oos_predictions: list[pd.DataFrame],
+        alpha: float,
+        titles: list[str],
+        rows: int,
+        columns: int
+    ):
+    """
+    Plots multiple predictions for the same country
+
+    Parameters:
+        data_train (pd.Series): The training part of the GDP time series
+        data_test (pd.Series): The testing_part of the GDP time series
+        country (str): The name of the country
+        test_predictions (list[pd.DataFrame]): The prediction intervals on the test set
+        oos_predictions (list[pd.DataFrame]): The out-of-sample (horizon) prediction intervals
+        alpha (float): The percentage of the prediction intervals 
+        titles (list[str]): The titles of each of the subplots
+        rows (int): The number of rows of plots
+        columns (int): The number of columns of plots    
+    """
+    fig, axs = plt.subplots(rows, columns, figsize=(12,8))
+
+    ax_list = axs.flatten()
+    for i, ax in enumerate(ax_list):
+        plot_forecast_intervals(
+            data_train=data_train,
+            data_test=data_test,
+            country=country,
+            test_predictions=test_predictions[i],
+            oos_predictions=oos_predictions[i],
+            alpha=alpha,
+            ax=ax,
+            title=titles[i],
+            show_legend=False
+        )
+    
+    handles, labels = [], []
+    ax = ax_list[0]
+    for handle, label in zip(*ax.get_legend_handles_labels()):
+        handles.append(handle)
+        labels.append(label)
+
+    fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
+
+    fig.suptitle(country, fontsize=16, weight='bold')
+    plt.tight_layout(rect=[0,0.05,1,0.92])
+    plt.show()
