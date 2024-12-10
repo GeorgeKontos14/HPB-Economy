@@ -7,23 +7,16 @@ from scipy.stats import mode
 from keras.optimizers import Adam # type: ignore
 from keras.losses import MeanSquaredError # type: ignore
 
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.multioutput import MultiOutputRegressor
-
-from skforecast.preprocessing import RollingFeatures, TimeSeriesDifferentiator
-from skforecast.recursive import ForecasterRecursiveMultiSeries
-from skforecast.direct import ForecasterDirectMultiVariate
+from skforecast.preprocessing import TimeSeriesDifferentiator
 from skforecast.deep_learning.utils import create_and_compile_model
 
 from Forecasting.ForecasterRNNProb import ForecastRNNProb
-from Forecasting.ForecasterMultioutput import ForecastDirectMultiOutput
 
 from Utils import ForecastingUtils
 
 def multiseries_independent_forecasts(
         y: np.ndarray,
         countries: list[str],
-        arima_orders: np.ndarray,
         train_split: float,
         start_year: int,
         horizon: int,
@@ -36,7 +29,6 @@ def multiseries_independent_forecasts(
     Parameters:
         y (np.ndarray): The input time series matrix of dimensions (m,T)
         countries (list[str]): The list containing the ISO3 codes for each country in the dataset
-        arima_order (np.ndarray): The (p,d,q) ARIMA orders of y, of shape (m,3)
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
@@ -51,13 +43,6 @@ def multiseries_independent_forecasts(
     """
     T = y.shape[1]
 
-    lags = [int(max(1,p)) for p in arima_orders[:,0]]
-    d = int(mode(arima_orders[:,1])[0])
-    q = int(mode(arima_orders[:,2])[0])
-    
-    differentiation =  d if d > 0 else None
-    window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
-
     split_ind = int(train_split*T)
     test_steps = T-split_ind
 
@@ -69,11 +54,17 @@ def multiseries_independent_forecasts(
     data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
     data_all = pd.DataFrame(y.T, index=T_all, columns=countries)    
 
-    forecaster = ForecasterRecursiveMultiSeries(
-        regressor = GradientBoostingRegressor(loss='quantile'),
-        lags=lags,
-        window_features=window_features,
-        differentiation=differentiation
+    forecaster, _ = ForecastingUtils.grid_search_multiple_inputs(
+        data_train=data_train,
+        data_test=data_test,
+        lags_bound=4,
+        difference_bound=2,
+        ma_bound=3,
+        lower_bound=lower_quantile,
+        upper_bound=upper_quantile,
+        countries_to_predict=countries, 
+        model_type='ForecasterRecursiveMultiSeries',
+        horizon=horizon
     )
 
     forecaster.fit(series=data_train)
@@ -99,7 +90,6 @@ def multiseries_independent_forecasts(
 def many_to_one_forecasts(
         y: np.ndarray,
         countries: list[str],
-        arima_orders: np.ndarray,
         train_split: float,
         start_year: int,
         horizon: int,
@@ -113,7 +103,6 @@ def many_to_one_forecasts(
     Parameters:
         y (np.ndarray): The input time series matrix of dimensions (m,T)
         countries (list[str]): The list containing the ISO-3 codes for each country in the dataset
-        arima_order (np.ndarray): The (p,d,q) ARIMA orders of y, of shape (m,3)
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
@@ -128,13 +117,6 @@ def many_to_one_forecasts(
         pd.DataFrame: The prediction intervals for the horizon
     """
     T = y.shape[1]
-
-    lags = [int(max(1,p)) for p in arima_orders[:,0]]
-    d = int(mode(arima_orders[:,1])[0])
-    q = int(mode(arima_orders[:,2])[0])
-    
-    differentiation =  d if d > 0 else None
-    window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
 
     split_ind = int(train_split*T)
     test_steps = T-split_ind
@@ -157,14 +139,19 @@ def many_to_one_forecasts(
         to_predict = countries
 
     for country in to_predict:
-        test_forecaster = ForecasterDirectMultiVariate(
-            regressor=GradientBoostingRegressor(loss='quantile'),
-            level=country,
-            steps=test_steps,
-            lags = lags,
-            window_features=window_features,
-            differentiation=differentiation
+        test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
+            data_train=data_train,
+            data_test=data_test,
+            lags_bound=4,
+            difference_bound=2,
+            ma_bound=3,
+            lower_bound=lower_quantile,
+            upper_bound=upper_quantile,
+            countries_to_predict=[country],
+            model_type='ForecasterDirectMultiVariate',
+            horizon=horizon
         )
+
         test_forecaster.fit(series=data_train)
         country_test_preds = test_forecaster.predict_interval(
             steps=test_steps,
@@ -177,14 +164,6 @@ def many_to_one_forecasts(
         )
         country_test_preds = pd.concat([country_test_preds, country_test_med, country_test_mean], axis=1)
 
-        horizon_forecaster = ForecasterDirectMultiVariate(
-            regressor=GradientBoostingRegressor(loss='quantile'),
-            level=country,
-            steps=horizon,
-            lags = lags,
-            window_features=window_features,
-            differentiation=differentiation
-        )
         horizon_forecaster.fit(series=data_all)
         country_horizon_preds = horizon_forecaster.predict_interval(
             steps=horizon,
@@ -205,7 +184,6 @@ def many_to_one_forecasts(
 def many_to_many_forecasts(
         y: np.ndarray,
         countries: list[str],
-        arima_orders: np.ndarray,
         train_split: float,
         start_year: int,
         horizon: int,
@@ -219,7 +197,6 @@ def many_to_many_forecasts(
     Parameters:
         y (np.ndarray): The input time series matrix of dimensions (m,T)
         countries (list[str]): The list containing the ISO-3 codes for each country in the dataset
-        arima_order (np.ndarray): The (p,d,q) ARIMA orders of y, of shape (m,3)
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
@@ -235,13 +212,6 @@ def many_to_many_forecasts(
     """
 
     T = y.shape[1]
-
-    lags = [int(max(1,p)) for p in arima_orders[:,0]]
-    d = int(mode(arima_orders[:,1])[0])
-    q = int(mode(arima_orders[:,2])[0])
-    
-    differentiation =  d if d > 0 else None
-    window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
 
     split_ind = int(train_split*T)
     test_steps = T-split_ind
@@ -260,15 +230,17 @@ def many_to_many_forecasts(
     else:
         to_predict = countries
 
-    test_forecaster = ForecastDirectMultiOutput(
-        regressor = MultiOutputRegressor(
-            GradientBoostingRegressor(loss='quantile')
-        ),
-        levels = to_predict,
-        steps = test_steps,
-        lags = lags,
-        window_features = window_features,
-        differentiation = differentiation
+    test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
+        data_train=data_train,
+        data_test=data_test,
+        lags_bound=4,
+        difference_bound=2,
+        ma_bound=3,
+        lower_bound=lower_quantile,
+        upper_bound=upper_quantile,
+        countries_to_predict=to_predict,
+        model_type='ForecastDirectMultiOutput',
+        horizon=horizon
     )
 
     test_forecaster.fit(series=data_train)
@@ -284,17 +256,6 @@ def many_to_many_forecasts(
         forecaster=test_forecaster, to_predict=to_predict, horizon=test_steps, univariate=False
     )
     test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
-    
-    horizon_forecaster = ForecastDirectMultiOutput(
-        regressor = MultiOutputRegressor(
-            GradientBoostingRegressor(loss='quantile')
-        ),
-        levels = to_predict,
-        steps = horizon,
-        lags = lags,
-        window_features = window_features,
-        differentiation = differentiation
-    )
 
     horizon_forecaster.fit(series=data_all)
 
@@ -315,15 +276,13 @@ def many_to_many_forecasts(
 def rnn_forecasts(
         y: np.ndarray,
         countries: list[str],
-        arima_orders: np.ndarray,
         layer_type: str,
-        recurrent_units: int,
-        dense_units: int,
         train_split: float,
         start_year: int,
         horizon: int,
         lower_quantile: float,
         upper_quantile: float,
+        differentiation: int = None,
         countries_to_predict: list[str] = None 
     ):
     """
@@ -334,13 +293,12 @@ def rnn_forecasts(
         countries (list[str]): The list containing the ISO-3 codes for each country in the dataset
         arima_order (np.ndarray): The (p,d,q) ARIMA orders of y, of shape (m,3)
         layer_type (str): The type of recurrent layer to be used, either LSTM or RNN
-        recurrent_units (int): Number of units in the recurrent layer(s)
-        dense_units (int): Number of units in each dense layer
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
         lower_quantile (float): The lower bound quantile to be predicted
         upper_quantile (float): The upper bound quantile to be predicted
+        differentiation (int): The order of differentiation
         countries_to_predict (list[str]): The codes of countries for which predictions should be made. If None, predictions for the entire dataset are performed
         
     Returns:
@@ -351,11 +309,6 @@ def rnn_forecasts(
     """
 
     T = y.shape[1]
-
-    lags = [int(max(1,p)) for p in arima_orders[:,0]]
-    d = int(mode(arima_orders[:,1])[0])
-    
-    differentiation =  d if d > 0 else None
 
     split_ind = int(train_split*T)
     test_steps = T-split_ind
@@ -386,7 +339,7 @@ def rnn_forecasts(
         for i, country in enumerate(countries):
             differenced[i] = differentiators[
                 country
-            ]. fit_transform(y[i])
+            ].fit_transform(y[i])
             differentiators_train[country].fit(y[i, :split_ind])
         differenced[:,0] = 0
 
@@ -394,35 +347,18 @@ def rnn_forecasts(
         data_test = pd.DataFrame(differenced[:, split_ind:].T, index=T_test, columns=countries)
         data_all = pd.DataFrame(differenced.T, index=T_all, columns=countries) 
 
-    model_test = create_and_compile_model(
-        series=data_train,
-        lags=lags,
-        steps=test_steps,
-        levels=to_predict,
-        recurrent_layer=layer_type,
-        recurrent_units=recurrent_units,
-        dense_units=dense_units,
-        optimizer=Adam(learning_rate=0.01),
-        loss=MeanSquaredError()
-    )
-
-    model_horizon = create_and_compile_model(
-        series=data_all,
-        lags=lags,
-        steps=horizon,
-        levels=to_predict,
-        recurrent_layer=layer_type,
-        recurrent_units=recurrent_units,
-        dense_units=dense_units,
-        optimizer=Adam(learning_rate=0.01),
-        loss=MeanSquaredError()
-    )
-
-    test_forecaster = ForecastRNNProb(
-        regressor=model_test,
-        levels=to_predict,
-        lags=lags,
-        steps=test_steps
+    test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_rnn(
+        data_train=data_train,
+        data_test=data_test,
+        data_all=data_all,
+        lags_bound=4,
+        layer_type=layer_type,
+        recurrent_layers = np.array([4,8,16,32]),
+        dense_layers = np.array([16,32,64]),
+        lower_bound=lower_quantile,
+        upper_bound=upper_quantile,
+        countries_to_predict=to_predict,
+        horizon=horizon
     )
 
     test_forecaster.fit(series=data_train)
@@ -445,13 +381,6 @@ def rnn_forecasts(
             country
         ].inverse_transform_next_window(test_preds[col].values)
 
-    horizon_forecaster = ForecastRNNProb(
-        regressor=model_horizon,
-        levels=to_predict,
-        lags=lags,
-        steps=horizon
-    )
-
     horizon_forecaster.fit(series=data_all)
 
     horizon_preds = horizon_forecaster.predict_interval(
@@ -466,10 +395,11 @@ def rnn_forecasts(
     )
     horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
 
-    for col in horizon_preds.columns:
-        country = col[:3]
-        horizon_preds[col] = differentiators[
-            country
-        ].inverse_transform_next_window(horizon_preds[col].values)
+    if differentiation is not None:
+        for col in horizon_preds.columns:
+            country = col[:3]
+            horizon_preds[col] = differentiators[
+                country
+            ].inverse_transform_next_window(horizon_preds[col].values)
 
     return data_train_pure, data_test_pure, test_preds, horizon_preds

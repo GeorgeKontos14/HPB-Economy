@@ -2,10 +2,7 @@ import numpy as np
 
 import pandas as pd
 
-from sklearn.ensemble import GradientBoostingRegressor
-
-from skforecast.preprocessing import RollingFeatures
-from skforecast.recursive import ForecasterRecursive, ForecasterSarimax
+from skforecast.recursive import ForecasterSarimax
 from skforecast.sarimax import Sarimax
 
 from Utils import ForecastingUtils
@@ -18,7 +15,8 @@ def univariate_forecast(
         horizon: int,
         lower_quantile: float,
         upper_quantile: float,
-        use_gbr: float = True
+        country: str,
+        use_gbr: float = True,
     ):
     """
     Performs probabilistic forecasting on a single univariate time series, using Gradient Boosting
@@ -31,6 +29,7 @@ def univariate_forecast(
         horizon (int): The number of future values to be predicted
         lower_quantile (float): The lower bound quantile to be predicted
         upper_quantile (float): The upper bound quantile to be predicted
+        country (str): The country for which predictions are made
         use_gbr (float): Indicates what model should be used. (True for GBR, False for ARIMA)
 
     Returns:
@@ -56,23 +55,15 @@ def univariate_forecast(
     data_all = pd.Series(y, index=T_all)
 
     if use_gbr:
-        lags = None
-        window_features = None
-        differentiation = None
-        if p >= 1:
-            lags = p
-        if q >= 1:
-            window_features = RollingFeatures(stats=['mean'], window_sizes=q)
-        if d >= 1:
-            differentiation = d
-        if lags is None and window_features is None:
-            lags=1
-
-        forecaster = ForecasterRecursive(
-            regressor = GradientBoostingRegressor(loss='quantile'),
-            lags = lags,
-            window_features = window_features,
-            differentiation=differentiation
+        forecaster = ForecastingUtils.grid_search_univariate(
+            data_train=data_train,
+            data_test=data_test,
+            lags_bound=4,
+            difference_bound=2,
+            ma_bound=3,
+            lower_bound=lower_quantile,
+            upper_bound=upper_quantile,
+            country=country
         )
     else:
         forecaster = ForecasterSarimax(regressor = Sarimax(order=(p,d,q)))

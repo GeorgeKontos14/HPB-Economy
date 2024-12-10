@@ -156,7 +156,8 @@ The [Forecasting](/Forecasting/) directory contains all the nesessary functional
 
 ### Utilities
 
-- [DataUtils.py](/Utils/DataUtils.py): Utility functions for rea- [HierarchicalClustering.py](/Clustering/HierarchicalClustering.py): Functionality for constracting tree structures for hierarchical clustering using different linkage methods and cutting the hierarchy tree to derive the optimal number of clustersding and writing data to files.
+- [DataUtils.py](/Utils/DataUtils.py): Utility functions for reading and writing data to files.
+- [ForecastingUtils.py](/Utils/ForecastingUtils.py): Utility functions to assist tuning and evaluation of forecasting algorithms
 - [PostProcessing.py](/Clustering/PostProcessing.py): Functionality for processing the results of all algorithms.
 - [PreProcessing.py](/Clustering/PreProcessing.py): The pre-processing functions required to construct the final dataset for all algorithms
 - [TimeSeriesUtilities.py](/Utils/TimeSeriesUtils.py): Utility functions for time series processing

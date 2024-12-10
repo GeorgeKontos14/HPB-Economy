@@ -258,7 +258,8 @@ def write_forecasts(
 
 def select_predictions(
         country: str, 
-        predictions: pd.DataFrame
+        predictions: pd.DataFrame,
+        only_bounds: bool = False
     ) -> pd.DataFrame:
     """
     Select and isolate the predictions of a specified country
@@ -266,21 +267,33 @@ def select_predictions(
     Parameters:
         country (str): The ISO-3 code of the specified country
         predictions (pd.DataFrame): The object containing predictions for multiple countries
-
+        only_bounds (bool): Whether or not to only take the upper and lower bounds
+        
     Returns:
         pd.DataFrame: The predictions for the selected country 
     """
+    if only_bounds:
+        new_cols = {
+            country: country,
+            f'{country}_lower_bound':'lower_bound',
+            f'{country}_upper_bound':'upper_bound',
+        }
+    else:
+        new_cols = {
+            country: country,
+            f'{country}_lower_bound':'lower_bound',
+            f'{country}_upper_bound':'upper_bound',
+            f'{country}_q_0.5': 'median',
+            f'{country}_mean': 'mean'
+        }
 
-    new_cols = {
-        country: country,
-        f'{country}_lower_bound':'lower_bound',
-        f'{country}_upper_bound':'upper_bound',
-        f'{country}_q_0.5': 'median',
-        f'{country}_mean': 'mean'
-    }
-
-    selected_preds = predictions[[
-        country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5', f'{country}_mean'
-    ]].rename(columns=new_cols)
+    if only_bounds:
+        selected_preds = predictions[[
+            country,f'{country}_lower_bound', f'{country}_upper_bound'
+        ]].rename(columns=new_cols)    
+    else:
+        selected_preds = predictions[[
+            country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5', f'{country}_mean'
+        ]].rename(columns=new_cols)
 
     return selected_preds
