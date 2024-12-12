@@ -2,17 +2,9 @@ import numpy as np
 
 import pandas as pd
 
-from scipy.stats import mode
-
-from keras.optimizers import Adam # type: ignore
-from keras.losses import MeanSquaredError # type: ignore
-
 from skforecast.preprocessing import TimeSeriesDifferentiator
-from skforecast.deep_learning.utils import create_and_compile_model
 
-from Forecasting.ForecasterRNNProb import ForecastRNNProb
-
-from Utils import ForecastingUtils
+from Utils import ForecastingUtils, PreProcessing
 
 def multiseries_independent_forecasts(
         y: np.ndarray,
@@ -40,19 +32,11 @@ def multiseries_independent_forecasts(
         pd.DataFrame: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
-    """
-    T = y.shape[1]
+    """  
 
-    split_ind = int(train_split*T)
-    test_steps = T-split_ind
-
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')    
-
-    data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
-    data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
-    data_all = pd.DataFrame(y.T, index=T_all, columns=countries)    
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
+        countries=countries, y=y, start_year=start_year, train_split=train_split
+    )
 
     forecaster, _ = ForecastingUtils.grid_search_multiple_inputs(
         data_train=data_train,
@@ -118,19 +102,13 @@ def many_to_one_forecasts(
     """
     T = y.shape[1]
 
-    split_ind = int(train_split*T)
-    test_steps = T-split_ind
-
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
     T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
+ 
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
+        countries=countries, y=y, start_year=start_year, train_split=train_split
+    )
 
-    data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
-    data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
-    data_all = pd.DataFrame(y.T, index=T_all, columns=countries)    
-
-    test_preds = pd.DataFrame(index=T_test)
+    test_preds = pd.DataFrame(index=data_test.index)
     horizon_preds = pd.DataFrame(index=T_horizon)
 
     if countries_to_predict is not None:
@@ -209,21 +187,11 @@ def many_to_many_forecasts(
         pd.DataFrane: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
-    """
+    """   
 
-    T = y.shape[1]
-
-    split_ind = int(train_split*T)
-    test_steps = T-split_ind
-
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
-
-    data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
-    data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
-    data_all = pd.DataFrame(y.T, index=T_all, columns=countries)    
-
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
+        countries=countries, y=y, start_year=start_year, train_split=train_split
+    )
 
     if countries_to_predict is not None:
         to_predict = countries_to_predict
@@ -310,16 +278,11 @@ def rnn_forecasts(
 
     T = y.shape[1]
 
-    split_ind = int(train_split*T)
-    test_steps = T-split_ind
+    split_ind = int(train_split*T) 
 
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
-
-    data_train_pure = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
-    data_test_pure = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
-    data_all_pure = pd.DataFrame(y.T, index=T_all, columns=countries)    
+    test_steps, data_train_pure, data_test_pure, data_all_pure = PreProcessing.preprocess_multivariate_forecast(
+        countries=countries, y=y, start_year=start_year, train_split=train_split
+    )
 
     if countries_to_predict is not None:
         to_predict = countries_to_predict
@@ -343,9 +306,9 @@ def rnn_forecasts(
             differentiators_train[country].fit(y[i, :split_ind])
         differenced[:,0] = 0
 
-        data_train = pd.DataFrame(differenced[:, :split_ind].T, index=T_train, columns=countries)
-        data_test = pd.DataFrame(differenced[:, split_ind:].T, index=T_test, columns=countries)
-        data_all = pd.DataFrame(differenced.T, index=T_all, columns=countries) 
+        data_train = pd.DataFrame(differenced[:, :split_ind].T, index=data_train.index, columns=countries)
+        data_test = pd.DataFrame(differenced[:, split_ind:].T, index=data_test.index, columns=countries)
+        data_all = pd.DataFrame(differenced.T, index=data_all.index, columns=countries) 
 
     test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_rnn(
         data_train=data_train,

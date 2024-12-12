@@ -308,6 +308,7 @@ def plot_forecast_intervals(
         test_predictions: pd.DataFrame,
         oos_predictions: pd.DataFrame,
         alpha:float,
+        baseline: dict = None,
         ax = None,
         title: str = None,
         show_legend: bool = True
@@ -321,13 +322,24 @@ def plot_forecast_intervals(
         country (str): The name of the country
         test_predictions (pd.DataFrame): The prediction intervals on the test set
         oos_predictions (pd.DataFrame): The out-of-sample (horizon) prediction intervals
-        alpha (float): The percentage of the prediction intervals 
+        alpha (float): The percentage of the prediction intervals
+        baseline (dict): The baseline values for the end of the horizon
         ax: The object to be used for plotting
         title (str): The title of the plot; if none, the name of the country
         show_legend (bool): Whether or not to display a legend alongside the plot.
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 5))
+
+    last_known_ind = data_test.index[-1]
+    last_known_val = data_test.iloc[-1]
+    last_horizon_ind = oos_predictions.index[-1]
+
+    tr_mean = data_train.mean()
+
+    extended_ind = pd.date_range(start = last_known_ind, end = last_horizon_ind+pd.Timedelta(days=365*3), freq='Y')
+    const_series = pd.Series([tr_mean]*len(extended_ind), index=extended_ind)
+    const_series.plot(ax=ax, label='_nonlegend_', color='none')
 
     if title is None:
         ax.set_title(country)
@@ -360,6 +372,21 @@ def plot_forecast_intervals(
         label = f'{alpha}% interval (out of sample)'
     )
 
+    if baseline is not None:
+        ax.scatter(last_horizon_ind, baseline['median'], marker='D', color='lime', label = 'Baseline Median')
+        ax.scatter(last_horizon_ind, baseline['mean'], marker='D', color='teal', label = 'Baseline Mean')
+
+        x = pd.date_range(start=last_known_ind, end=last_horizon_ind, freq='Y')
+        y_lower = np.linspace(last_known_val, baseline['lower_bound'], num=len(x))
+        y_upper = np.linspace(last_known_val, baseline['upper_bound'], num=len(x))
+
+        y_lower = pd.Series(y_lower, index=x)
+        y_upper = pd.Series(y_upper, index=x)
+
+        y_lower.plot(ax=ax, color='blue', linestyle='--', label = 'Baseline Interval')
+        y_upper.plot(ax=ax, color='blue', linestyle='--', label = '_nonlegend_')
+
+
     if show_legend:
         ax.legend()
 
@@ -370,6 +397,7 @@ def plot_many_predictions(
         test_predictions: list[pd.DataFrame],
         oos_predictions: list[pd.DataFrame],
         alpha: float,
+        baseline: dict,
         titles: list[str],
         rows: int,
         columns: int
@@ -383,7 +411,8 @@ def plot_many_predictions(
         country (str): The name of the country
         test_predictions (list[pd.DataFrame]): The prediction intervals on the test set
         oos_predictions (list[pd.DataFrame]): The out-of-sample (horizon) prediction intervals
-        alpha (float): The percentage of the prediction intervals 
+        alpha (float): The percentage of the prediction intervals
+        baseline (dict): The baseline values for the end of the horizon
         titles (list[str]): The titles of each of the subplots
         rows (int): The number of rows of plots
         columns (int): The number of columns of plots    
@@ -399,6 +428,7 @@ def plot_many_predictions(
             test_predictions=test_predictions[i],
             oos_predictions=oos_predictions[i],
             alpha=alpha,
+            baseline=baseline,
             ax=ax,
             title=titles[i],
             show_legend=False

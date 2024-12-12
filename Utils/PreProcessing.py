@@ -1,3 +1,5 @@
+from typing import Tuple, Union
+
 import numpy as np
 
 import pandas as pd
@@ -149,3 +151,97 @@ def preprocess_onlyGDP(
     scaled_df = pd.DataFrame(scaled_data, columns=df.columns, index=df.index)
 
     return df, scaled_df, scaled_data
+
+
+def make_indexes(
+        start_year: int,
+        split_ind: int,
+        T: int
+    ) -> Tuple[pd.DatetimeIndex, pd.DatetimeIndex, pd.DatetimeIndex]:
+    """
+    Creates datetime indices for the specified period
+
+    Parameters:
+        start_year (int): The start year of the time series
+        split_ind (int): The index where the training and test sets are split
+        T (int): The length of the time series
+
+    Returns:
+        pd.DatetimeIndex: The index of the training set
+        pd.DatetimeIndex: The index of the test set
+        pd.DatetimeIndex: The index of the entire dataset
+    """
+    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
+    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
+    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
+
+    return T_train, T_test, T_all
+
+def preprocess_univariate_forecast(
+        y: np.ndarray,
+        start_year: int,
+        train_split: float
+    ) -> Tuple[int, pd.Series, pd.Series, pd.Series]:
+    """
+    Creates a training and a test set for a given dataset.
+
+    Parameters:
+        y (np.ndarray): The dataset
+        start_year (int): The start year of the time series
+        train_split (float): The split between train and test set (must be in (0,1))
+    
+    Returns:
+        int: The number of test steps
+        pd.Series: The training set
+        pd.Series: The test set
+        pd.Series: The dataset in a Series form
+    """
+
+    T = len(y)
+    split_ind = int(train_split*T)
+    test_steps = T-split_ind
+
+    T_train, T_test, T_all = make_indexes(
+        start_year=start_year, split_ind=split_ind, T=T
+    )
+
+    data_train = pd.Series(y[:split_ind], index=T_train)
+    data_test = pd.Series(y[split_ind:], index=T_test)
+    data_all = pd.Series(y, index=T_all)
+
+    return test_steps, data_train, data_test, data_all   
+
+def preprocess_multivariate_forecast(
+        countries: list[str],
+        y: np.ndarray,
+        start_year: int,
+        train_split: float
+    ) -> Tuple[int, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Creates a training and a test set for a given dataset.
+
+    Parameters:
+        countries (list[str]): The countries in the dataset
+        y (np.ndarray): The dataset
+        start_year (int): The start year of the time series
+        train_split (float): The split between train and test set (must be in (0,1))
+    
+    Returns:
+        int: The number of test steps
+        pd.DataFrame: The training set
+        pd.DataFrame: The test set
+        pd.DataFrame: The dataset in a dataframe form
+    """
+    T = y.shape[1]
+    split_ind = int(T*train_split)
+    test_steps = T-split_ind
+
+    T_train, T_test, T_all = make_indexes(
+        start_year=start_year, split_ind=split_ind, T=T
+    )
+
+    data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
+    data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)
+    data_all = pd.DataFrame(y.T, index=T_all, columns=countries) 
+
+    return test_steps, data_train, data_test, data_all

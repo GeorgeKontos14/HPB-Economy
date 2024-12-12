@@ -297,3 +297,38 @@ def select_predictions(
         ]].rename(columns=new_cols)
 
     return selected_preds
+
+def select_baseline(
+        country: str,
+        stats: pd.DataFrame,
+        use_67: bool = True    
+    ) -> dict:
+    """
+    Selects the baseline predictions for a given country
+
+    Parameters:
+        country (str): The ISO-3 code of the country to select
+        stats (pd.DataFrame): The dataframe containing prediction statistics
+        use_67 (bool): Whether or not to use the 67% prediction intervals; if False, 90% prediction intervals are used
+    
+    Returns:
+        dict: A dictionary containing the bounds, mean and median for the final step of the horizon
+    """
+    if use_67:
+        lower = 0.16
+        upper = 0.84
+    else:
+        lower = 0.05
+        upper = 0.95
+
+    row = stats.loc[country]
+    curr = row['2017Value']
+    results = {
+        'curr': curr,
+        'lower_bound': np.log(row[lower])+curr,
+        'upper_bound': np.log(row[upper])+curr,
+        'median': np.log(row[0.5])+curr,
+        'mean': np.log(row['Mean'])+curr
+    }
+
+    return results

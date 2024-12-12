@@ -5,7 +5,7 @@ import pandas as pd
 from skforecast.recursive import ForecasterSarimax
 from skforecast.sarimax import Sarimax
 
-from Utils import ForecastingUtils
+from Utils import ForecastingUtils, PreProcessing
 
 def univariate_forecast(
         y: np.ndarray,
@@ -42,17 +42,9 @@ def univariate_forecast(
     d = int(arima_order[1])
     q = int(arima_order[2])
 
-    T = len(y)
-    split_ind = int(train_split*T)
-    test_steps = T-split_ind
-
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
-
-    data_train = pd.Series(y[:split_ind], index=T_train)
-    data_test = pd.Series(y[split_ind:], index=T_test)
-    data_all = pd.Series(y, index=T_all)
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_univariate_forecast(
+        y = y, start_year = start_year, train_split = train_split
+    )
 
     if use_gbr:
         forecaster = ForecastingUtils.grid_search_univariate(
