@@ -304,11 +304,11 @@ def rnn_forecasts(
                 country
             ].fit_transform(y[i])
             differentiators_train[country].fit(y[i, :split_ind])
-        differenced[:,0] = 0
+        differenced[:,:differentiation] = 0
 
-        data_train = pd.DataFrame(differenced[:, :split_ind].T, index=data_train.index, columns=countries)
-        data_test = pd.DataFrame(differenced[:, split_ind:].T, index=data_test.index, columns=countries)
-        data_all = pd.DataFrame(differenced.T, index=data_all.index, columns=countries) 
+        data_train = pd.DataFrame(differenced[:, :split_ind].T, index=data_train_pure.index, columns=countries)
+        data_test = pd.DataFrame(differenced[:, split_ind:].T, index=data_test_pure.index, columns=countries)
+        data_all = pd.DataFrame(differenced.T, index=data_all_pure.index, columns=countries) 
 
     test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_rnn(
         data_train=data_train,
@@ -338,11 +338,12 @@ def rnn_forecasts(
     )
     test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
 
-    for col in test_preds.columns:
-        country = col[:3]
-        test_preds[col] = differentiators_train[
-            country
-        ].inverse_transform_next_window(test_preds[col].values)
+    if differentiation is not None:
+        for col in test_preds.columns:
+            country = col[:3]
+            test_preds[col] = differentiators_train[
+                country
+            ].inverse_transform_next_window(test_preds[col].values)
 
     horizon_forecaster.fit(series=data_all)
 

@@ -954,11 +954,11 @@ class ForecastDirectMultiOutput(ForecasterBase):
 
         for i, level in enumerate(self.levels):
             if self.differentiation is not None:
-                predictions[i] = self.differentiator_[
+                predictions[:, i] = self.differentiator_[
                     level
-                ].inverse_transform_next_window(predictions[i])
-            predictions[i] = transform_numpy(
-                array = predictions[i],
+                ].inverse_transform_next_window(predictions[:, i])
+            predictions[:, i] = transform_numpy(
+                array = predictions[:, i],
                 transformer = self.transformer_series_[level],
                 fit = False,
                 inverse_transform = True 

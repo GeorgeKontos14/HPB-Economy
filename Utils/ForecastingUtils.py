@@ -417,17 +417,18 @@ def grid_search_multiple_inputs(
     d_list = np.arange(difference_bound+1)
     q_list = np.arange(ma_bound+1)
 
-    arrays = [p_list]*n+[d_list, q_list]
+    arrays = [p_list, d_list, q_list]
     grids = np.meshgrid(*arrays, indexing='ij')
     configurations = np.stack([grid.ravel() for grid in grids], axis=-1)
 
-    interval_lengths = np.zeros((len(configurations), m))
-    cov = np.zeros((len(configurations), m))
+    no_configs = len(configurations)
+    interval_lengths = np.zeros((no_configs, m))
+    cov = np.zeros((no_configs, m))
 
     for i, config in enumerate(configurations):
-        p = [int(lag) for lag in config[:(n-2)]]
-        d = int(config[n-2])
-        q = int(config[n-1])
+        p = int(config[0])
+        d = int(config[1])
+        q = int(config[2])
         
         forecaster = create_multivariate_forecaster(
             p = p,
@@ -452,9 +453,9 @@ def grid_search_multiple_inputs(
     means = np.mean(cov_ratios, axis=1)
     ind = np.argmax(means)
     config = configurations[ind]
-    p = [int(lag) for lag in config[:(n-2)]]
-    d = int(config[n-2])
-    q = int(config[n-1])
+    p = int(config[0])
+    d = int(config[1])
+    q = int(config[2])
 
     forecaster_test = create_multivariate_forecaster(
         p = p,
@@ -516,7 +517,7 @@ def grid_search_rnn(
     m = len(countries_to_predict)
     
     p_list = np.arange(start=1, stop=lags_bound+1)
-    arrays = [p_list]*n+[recurrent_layers, dense_layers]
+    arrays = [p_list, recurrent_layers, dense_layers]
     grids = np.meshgrid(*arrays, indexing='ij')
     configurations = np.stack([grid.ravel() for grid in grids], axis=-1)
 
@@ -524,9 +525,9 @@ def grid_search_rnn(
     cov = np.zeros((len(configurations), m))
 
     for i, config in enumerate(configurations):
-        p = [int(lag) for lag in config[:(n-2)]]
-        ru = int(config[n-2])
-        du = int(config[n-1])
+        p = int(config[0])
+        ru = int(config[1])
+        du = int(config[2])
 
         forecaster = create_rnn_forecaster(
             series = data_train,
@@ -552,9 +553,9 @@ def grid_search_rnn(
     means = np.mean(cov_ratios, axis=1)
     ind = np.argmax(means)
     config = configurations[ind]
-    p = [int(lag) for lag in config[:(n-2)]]
-    ru = int(config[n-2])
-    du = int(config[n-1])
+    p = int(config[0])
+    ru = int(config[1])
+    du = int(config[2])
 
     forecaster_test = create_rnn_forecaster(
         series = data_train,

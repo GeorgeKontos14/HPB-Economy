@@ -355,7 +355,7 @@ def plot_forecast_intervals(
         test_predictions['upper_bound'],
         color = 'lightskyblue',
         alpha = 0.3,
-        label = f'{alpha}% interval (in sample)'
+        label = f'{alpha}% interval (test)'
     )
 
     test_predictions['median'].plot(ax=ax, color='r', label='Median')
@@ -369,22 +369,20 @@ def plot_forecast_intervals(
         oos_predictions['upper_bound'],
         color = 'coral',
         alpha = 0.8,
-        label = f'{alpha}% interval (out of sample)'
+        label = f'{alpha}% interval (horizon)'
     )
 
     if baseline is not None:
-        ax.scatter(last_horizon_ind, baseline['median'], marker='D', color='lime', label = 'Baseline Median')
-        ax.scatter(last_horizon_ind, baseline['mean'], marker='D', color='teal', label = 'Baseline Mean')
-
         x = pd.date_range(start=last_known_ind, end=last_horizon_ind, freq='Y')
-        y_lower = np.linspace(last_known_val, baseline['lower_bound'], num=len(x))
-        y_upper = np.linspace(last_known_val, baseline['upper_bound'], num=len(x))
 
-        y_lower = pd.Series(y_lower, index=x)
-        y_upper = pd.Series(y_upper, index=x)
+        y_median = np.linspace(last_known_val, baseline['median'], num=len(x))
+        y_mean = np.linspace(last_known_val, baseline['median'], num=len(x))
+        
+        y_median = pd.Series(y_median, index=x)
+        y_mean = pd.Series(y_mean, index=x)
 
-        y_lower.plot(ax=ax, color='blue', linestyle='--', label = 'Baseline Interval')
-        y_upper.plot(ax=ax, color='blue', linestyle='--', label = '_nonlegend_')
+        y_median.plot(ax=ax, color='lime', linestyle='--', label = 'Baseline Median')
+        y_mean.plot(ax=ax, color='teal', linestyle='--', label = 'Baseline Mean')
 
 
     if show_legend:
