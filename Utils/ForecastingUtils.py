@@ -127,7 +127,7 @@ def calculate_metrics(
     median_loss = pinball_loss(y, test_preds['median'].values, 0.5)
 
     idx = [
-        'Probability Coverage', 
+        f'Probability Coverage {upper_bound-lower_bound}%', 
         f'Pinball Loss for {lower_bound}th Quantile',
         f'Pinball Loss for Median',
         f'Pinball Loss for {upper_bound}th Quantile'

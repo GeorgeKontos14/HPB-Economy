@@ -1,3 +1,4 @@
+from re import M
 import numpy as np
 
 import pandas as pd
@@ -87,7 +88,7 @@ def plot_clusters(
     for yi in range(k):
         plt.subplot(rows, columns, yi+1)
         for xx in data[labels == yi]:
-            plt.plot(time, xx.ravel(), 'k-', alpha=.2)
+            plt.plot(time, xx.ravel(), alpha=.7)
         if cluster_centers is not None:
             plt.plot(time, cluster_centers[yi].ravel(), 'lime')
         plt.text(0.55, 0.85, f'Cluster {yi+1}',
@@ -218,9 +219,9 @@ def show_clusters_on_map(
     df = world.merge(y_frame, how='inner', left_on='ISO_A3_EH', right_on='CODE')
 
     fig, ax = plt.subplots(1,1, figsize=(15,10))
-    fig.patch.set_facecolor('black')
+    fig.patch.set_facecolor('white')
     if title is not None:
-        plt.title(title, color='white')
+        plt.title(title, color='black')
     
     df.plot(column='LABEL', ax=ax)
     ax.axis('off')
@@ -429,6 +430,115 @@ def plot_many_predictions(
             baseline=baseline,
             ax=ax,
             title=titles[i],
+            show_legend=False
+        )
+    
+    handles, labels = [], []
+    ax = ax_list[0]
+    for handle, label in zip(*ax.get_legend_handles_labels()):
+        handles.append(handle)
+        labels.append(label)
+
+    fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
+
+    fig.suptitle(country, fontsize=16, weight='bold')
+    plt.tight_layout(rect=[0,0.05,1,0.92])
+    plt.show()
+
+def plot_predictions_both_intervals(
+        data_train: pd.Series,
+        data_test: pd.Series,
+        country: str,
+        oos_predictions67: pd.DataFrame,
+        oos_predictions90: pd.DataFrame,
+        ax = None,
+        title: str = None,
+        show_legend: bool = True
+    ):
+    """
+    Plots the probabilistic forecast for a given country
+
+    Parameters:
+        data_train (pd.Series): The training part of the GDP time series
+        data_test (pd.Series): The testing_part of the GDP time series
+        country (str): The name of the country
+        oos_predictions67 (pd.DataFrame): The out-of-sample (horizon)  67% prediction intervals
+        oos_predictions67 (pd.DataFrame): The out-of-sample (horizon)  90% prediction intervals
+        ax: The object to be used for plotting
+        title (str): The title of the plot; if none, the name of the country
+        show_legend (bool): Whether or not to display a legend alongside the plot.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+    if title is None:
+        ax.set_title(country)
+    else:
+        ax.set_title(title)
+
+    data_train.plot(ax=ax, label='Train', color='black')
+    data_test.plot(ax=ax, label="Test", color='g')
+
+    oos_predictions67['median'].plot(ax=ax, color='r', label='_nonlegend_')
+    oos_predictions67['mean'].plot(ax=ax, color='blueviolet', label='_nonlegend_')
+    
+    ax.fill_between(
+        oos_predictions67.index,
+        oos_predictions67['lower_bound'],
+        oos_predictions67['upper_bound'],
+        color = 'coral',
+        alpha = 0.8,
+        label = f'67% interval (horizon)'
+    )
+
+    ax.fill_between(
+        oos_predictions90.index,
+        oos_predictions90['lower_bound'],
+        oos_predictions90['upper_bound'],
+        color = 'coral',
+        alpha = 0.3,
+        label = f'90% interval (horizon)'
+    )
+
+
+    if show_legend:
+        ax.legend()
+
+def plot_many_predictions_both_intervals(
+        data_train: pd.DataFrame,
+        data_test: pd.DataFrame,
+        country: str,
+        oos_predictions67: list[pd.DataFrame],
+        oos_predictions90: list[pd.DataFrame],
+        titles: list[str],
+        rows: int,
+        columns: int
+    ):
+    """
+    Plots multiple predictions for the same country
+
+    Parameters:
+        data_train (pd.Series): The training part of the GDP time series
+        data_test (pd.Series): The testing_part of the GDP time series
+        country (str): The name of the country
+        oos_predictions67 (list[pd.DataFrame]): The out-of-sample (horizon) 67% prediction intervals
+        oos_predictions90 (list[pd.DataFrame]): The out-of-sample (horizon) 90% prediction intervals
+        titles (list[str]): The titles of each of the subplots
+        rows (int): The number of rows of plots
+        columns (int): The number of columns of plots    
+    """
+    fig, axs = plt.subplots(rows, columns, figsize=(12,8))
+
+    ax_list = axs.flatten()
+    for i, ax in enumerate(ax_list):
+        plot_predictions_both_intervals(
+            data_train=data_train,
+            data_test=data_test,
+            country=country,
+            oos_predictions67=oos_predictions67[i],
+            oos_predictions90=oos_predictions90[i],
+            ax=ax,
+            title = titles[i],
             show_legend=False
         )
     
