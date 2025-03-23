@@ -553,3 +553,75 @@ def plot_many_predictions_both_intervals(
     fig.suptitle(country, fontsize=16, weight='bold')
     plt.tight_layout(rect=[0,0.05,1,0.92])
     plt.show()
+
+def plot_prediction_and_baseline(
+        country: str,
+        model_type: str,
+        ind: int,
+        start_year: int,
+        T: int,
+        gdp: np.ndarray,
+        low_freq: np.ndarray,
+        pred67: pd.DataFrame,
+        pred90: pd.DataFrame,
+        q05: np.ndarray,
+        q16: np.ndarray,
+        q84: np.ndarray,
+        q95: np.ndarray,
+    ):
+    """
+    Plot the prediction intervals of a specific model and the baseline on the same plot
+
+    Parameters:
+        country (str): The name of the country
+        model_type (str): The type of model that was used for the predictions
+        ind (int): The index corresponding to the country
+        start_year (int): The start year of the observed data
+        T (int): The duration of the observed data
+        gdp (np.ndarray): The observed GDP data for all countries
+        low_freq (np.ndarray): The low-frequency trend of the observed data
+        pred67 (pd.DataFrame): The 67% prediction intervals the model has produces for the desired country
+        pred90 (pd.DataFrame): The 90% prediction intervals the model has produces for the desired country
+        q05 (np.ndarray): The 5th baseline quantile
+        q16 (np.ndarray): The 16th baseline quantile
+        q84 (np.ndarray): The 84th baseline quantile
+        q95 (np.ndarray): The 95th baseline quantile
+    """
+    T_horizon = len(q05[:,0])
+    in_sample_time = np.arange(start_year, start_year+T)
+    horizon_time = np.arange(start_year+T, start_year+T+T_horizon)
+
+    fig, axs = plt.subplots(2, 1, figsize=(14,10))
+    ax_list = axs.flatten()
+
+    ax = ax_list[0]
+    ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
+    ax.plot(in_sample_time, low_freq[:,ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
+    ax.fill_between(
+        horizon_time, q16[:, ind], q84[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
+    )
+    ax.fill_between(
+        horizon_time, pred67['lower_bound'], pred67['upper_bound'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+    )
+    ax.set_title(f'67% Prediction Intervals')
+
+    ax = ax_list[1]
+    ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
+    ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
+    ax.fill_between(
+        horizon_time, q05[:, ind], q95[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
+    )
+    ax.fill_between(
+        horizon_time, pred90['lower_bound'], pred90['upper_bound'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+    )
+    ax.set_title(f'90% Prediction Intervals')
+
+    handles, labels = [], []
+    for handle, label in zip(*ax.get_legend_handles_labels()):
+        handles.append(handle)
+        labels.append(label)
+    
+    fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
+    fig.suptitle(country, fontsize=16, weight='bold')
+    plt.tight_layout(rect=[0,0.05,1,0.92])
+    plt.show()

@@ -199,6 +199,122 @@ def evaluate(
     
     return metrics, intervals
 
+def interval_overlap_ratio(
+        T_horizon: int, 
+        preds: pd.DataFrame, 
+        baseline_low: np.ndarray, 
+        baseline_up: np.ndarray
+    ) -> float:
+    """
+    Calculate the interval overlap ratio between the predictions of a model and the baseline for a specific country
+
+    Parameters:
+        T_horizon (int): The number of years on the horizon
+        preds (pd.DataFrame): The predictions for that country
+        baseline_low (np.ndarray): The lower bound of the baseline prediction interval
+        baseline_up (np.ndarray): The upper bound of the baseline prediction interval
+
+    Returns:
+        float: The (average) interval overlap ratio across the predictions of that country 
+    """
+    ratio = 0
+    L = preds['lower_bound'].to_numpy()
+    U = preds['upper_bound'].to_numpy()
+    for i in range(T_horizon):
+        num = max(0, min(U[i], baseline_up[i])-max(L[i], baseline_low[i]))
+        denom = max(U[i], baseline_up[i])-min(L[i], baseline_low[i])
+        ratio += num/denom
+
+    return ratio/T_horizon
+
+def relative_interval_width_ratio(
+        T_horizon: int, 
+        preds: pd.DataFrame, 
+        baseline_low: np.ndarray, 
+        baseline_up: np.ndarray
+    ) -> float:
+    """
+    Calculate the relative interval width ratio between the predictions of a model and the baseline for a specific country
+
+    Parameters:
+        T_horizon (int): The number of years on the horizon
+        preds (pd.DataFrame): The predictions for that country
+        baseline_low (np.ndarray): The lower bound of the baseline prediction interval
+        baseline_up (np.ndarray): The upper bound of the baseline prediction interval
+
+    Returns:
+        float: The (average) relative interval width ratio across the predictions of that country 
+    """
+    ratio = 0
+    L = preds['lower_bound'].to_numpy()
+    U = preds['upper_bound'].to_numpy()
+    for i in range(T_horizon):
+        num = U[i]-L[i]
+        denom = baseline_up[i]-baseline_low[i]
+        ratio += num/denom
+
+    return ratio/T_horizon
+
+def compare_to_baseline(
+        countries: list[str],
+        T_horizon: int,
+        preds67: pd.DataFrame,
+        preds90: pd.DataFrame,
+        q05: np.ndarray,
+        q16: np.ndarray,
+        q84: np.ndarray,
+        q95: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compare the results of a model to the baseline predictions
+
+    Parameters:
+        countries (list[str]): The ISO3 codes of all countries
+        T_horizon (int): The number of predicted observations
+        preds67 (pd.DataFrame): The 67% prediction intervals of the model
+        preds90 (pd.DataFrame): The 90% prediction intervals of the model
+        q05 (np.ndarray): The 5th baseline quantile
+        q16 (np.ndarray): The 16th baseline quantile
+        q84 (np.ndarray): The 84th baseline quantile
+        q95 (np.ndarray): The 95th baseline quantile
+
+    Returns:
+        np.ndarray: The interval overlap ratio (per country) for 67% intervals
+        np.ndarray: The relative width ratio (per country) for 67% intervals        
+        np.ndarray: The interval overlap ratio (per country) for 90% intervals
+        np.ndarray: The relative width ratio (per country) for 90% intervals
+    """
+    n = len(countries)
+    overlap_ratios67 = np.zeros(n)
+    width_ratios67 = np.zeros(n)
+    overlap_ratios90 = np.zeros(n)
+    width_ratios90 = np.zeros(n)
+    for j, country in enumerate(countries):
+        pred67 = DataUtils.select_predictions(country, preds67)
+        pred90 = DataUtils.select_predictions(country, preds90)
+        baseline05 = q05[:, j]
+        baseline16 = q16[:, j]
+        baseline84 = q84[:, j]
+        baseline95 = q95[:, j]
+        overlap_ratios67[j] = interval_overlap_ratio(T_horizon, pred67, baseline16, baseline84)
+        width_ratios67[j] = relative_interval_width_ratio(T_horizon, pred67, baseline16, baseline84)
+        overlap_ratios90[j] = interval_overlap_ratio(T_horizon, pred90, baseline05, baseline95)
+        width_ratios90[j] = relative_interval_width_ratio(T_horizon, pred90, baseline05, baseline95)
+
+    print("Interval Overlap Ratios")
+    print(f"67% Prediction Intervals")
+    print(f"Mean: {np.mean(overlap_ratios67)}\nStandard Deviation: {np.std(overlap_ratios67)}")
+    print(f"90% Prediction Intervals")
+    print(f"Mean: {np.mean(overlap_ratios90)}\nStandard Deviation: {np.std(overlap_ratios90)}")
+    print("----------------------------------------")
+    print("Relative Width Ratios")
+    print(f"67% Prediction Intervals")
+    print(f"Mean: {np.mean(width_ratios67)}\nStandard Deviation: {np.std(width_ratios67)}")
+    print(f"90% Prediction Intervals")
+    print(f"Mean: {np.mean(width_ratios90)}\nStandard Deviation: {np.std(width_ratios90)}")    
+
+    return overlap_ratios67, width_ratios67, overlap_ratios90, width_ratios90
+
 def create_univariate_forecaster(
         p: int,
         d: int,

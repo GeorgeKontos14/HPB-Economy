@@ -4,6 +4,8 @@ import numpy as np
 
 import pandas as pd
 
+from scipy.io import loadmat
+
 import csv
 
 import geopandas as gp
@@ -205,6 +207,40 @@ def load_forecast(
     horizon_preds.index = T_horizon
 
     return test_preds, horizon_preds
+
+def load_baseline_data(
+        n: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Loads baseline econometric models results for comparison
+
+    Parameters:
+        n (int): The number of countries in the experiment
+
+    Returns:
+        np.ndarray: The low frequency in-sample data
+        np.ndarray: The 5th quantile of the baseline predictions
+        np.ndarray: The 16th quantile of the baseline predictions
+        np.ndarray: The 84th quantile of the baseline predictions
+        np.ndarray: The 95th quantile of the baseline predictions
+        np.ndarray: The median of the baseline predictions
+        np.ndarray: The mean of the baseline predictions 
+    """
+    paths_F = np.array(loadmat("mcmc/path_F_draws_baseline.mat")['path_F_draws'])
+    paths_U = np.array(loadmat("mcmc/paths_U_draws_baseline.mat")['paths_U_draws'])
+    draws = np.zeros((218,n,3000))
+    for i in range(n):
+        draws[:, i, :] = paths_F+paths_U[:, i, :]
+    low_frequency = draws[60:118,:,0]
+    horizon50 = draws[118:168,:]
+    q05 = np.quantile(horizon50, 0.05, axis=2)
+    q16 = np.quantile(horizon50, 0.16, axis=2)
+    q84 = np.quantile(horizon50, 0.84, axis=2)
+    q95 = np.quantile(horizon50, 0.95, axis=2)
+    median = np.quantile(horizon50, 0.5, axis=2)
+    mean = np.mean(horizon50, axis=2)
+    return low_frequency, q05, q16, q84, q95, median, mean 
+    
 
 def write_data(data: np.ndarray, path: str):
     """
