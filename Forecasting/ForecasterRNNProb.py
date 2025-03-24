@@ -550,7 +550,7 @@ class ForecastRNNProb(ForecasterBase):
                         f"or `NaNs` values. Check {check_residuals}."
                     )
 
-        X, prediction_index = self._create_predict_inputs(steps=steps)
+        X, prediction_index = self._create_predict_inputs(steps=steps, last_window=last_window)
 
         predictions = self.regressor.predict(X, verbose=0)
         predictions = np.squeeze(predictions, axis=0)

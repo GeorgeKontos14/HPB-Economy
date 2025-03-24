@@ -4,6 +4,7 @@ import numpy as np
 
 import pandas as pd
 
+import skforecast
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.multioutput import MultiOutputRegressor
 
@@ -314,6 +315,27 @@ def compare_to_baseline(
     print(f"Mean: {np.mean(width_ratios90)}\nStandard Deviation: {np.std(width_ratios90)}")    
 
     return overlap_ratios67, width_ratios67, overlap_ratios90, width_ratios90
+
+def predict_in_sample(data_train: pd.DataFrame, forecaster: ForecasterBase) -> pd.DataFrame:
+    """
+    Perform in sample predictions for a given (trained) forecaster
+
+    Parameters:
+        data_all (pd.DataFrame): All the observed data
+        forecaster (ForecasterBase): The trained forecaster model. Could be univariate or multivariate
+        T (int): The number of observations per time series
+    
+    Returns:
+        pd.DataFrame: The in-sample 67% and 90% prediction intervals
+    """
+    if isinstance(forecaster, ForecasterRecursiveMultiSeries):
+        size = len(list(forecaster.last_window_.values())[0])
+    else:
+        size = forecaster.last_window_.shape[0]
+    remaining_steps = len(data_train)-size
+    first_window = data_train[:size]
+    all_preds = forecaster.predict_quantiles(steps = remaining_steps, last_window=first_window, quantiles = [0.05, 0.16, 0.84, 0.95])
+    return all_preds[:remaining_steps]
 
 def create_univariate_forecaster(
         p: int,

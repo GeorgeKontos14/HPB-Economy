@@ -625,3 +625,17 @@ def plot_prediction_and_baseline(
     fig.suptitle(country, fontsize=16, weight='bold')
     plt.tight_layout(rect=[0,0.05,1,0.92])
     plt.show()
+
+# def plot_predictions_all_samples(
+#         country: str,
+#         univariate: bool,
+#         start_year: int,
+#         T: int,
+#         T_train: int,
+#         gdp: np.ndarray,
+#         in_sample_preds: pd.DataFrame,
+#         test_preds67: pd.DataFrame,    
+#         horizon_preds67: pd.DataFrame,
+#         test_preds90: pd.DataFrame,
+#         horizon_preds90: pd.DataFrame
+#     ):

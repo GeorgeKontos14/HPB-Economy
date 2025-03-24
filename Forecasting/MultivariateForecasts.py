@@ -32,6 +32,7 @@ def multiseries_independent_forecasts(
         pd.DataFrame: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
     """  
 
     test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
@@ -69,7 +70,9 @@ def multiseries_independent_forecasts(
     )
     horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
     
-    return data_train, data_test, test_preds, horizon_preds
+    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, forecaster)
+
+    return data_train, data_test, test_preds, horizon_preds, in_sample_preds
 
 def many_to_one_forecasts(
         y: np.ndarray,
@@ -99,9 +102,10 @@ def many_to_one_forecasts(
         pd.DataFrane: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
     """
     T = y.shape[1]
-
+    T_in = pd.date_range(start=f'{start_year+T-horizon}', end=f'{start_year+T}')
     T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
  
     test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
@@ -110,6 +114,7 @@ def many_to_one_forecasts(
 
     test_preds = pd.DataFrame(index=data_test.index)
     horizon_preds = pd.DataFrame(index=T_horizon)
+    in_sample_preds = pd.DataFrame(index=T_in)
 
     if countries_to_predict is not None:
         to_predict = countries_to_predict
@@ -153,9 +158,11 @@ def many_to_one_forecasts(
             forecaster=horizon_forecaster, to_predict=[country], horizon=horizon, univariate=True
         )
         country_horizon_preds = pd.concat([country_horizon_preds, country_horizon_med, country_horizon_mean], axis=1)
+        country_in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
 
         test_preds = pd.concat([test_preds, country_test_preds], axis=1)
         horizon_preds = pd.concat([horizon_preds, country_horizon_preds], axis=1)
+        in_sample_preds = pd.concat([in_sample_preds, country_in_sample_preds], axis=1)
 
     return data_train, data_test, test_preds, horizon_preds
 
@@ -187,6 +194,7 @@ def many_to_many_forecasts(
         pd.DataFrane: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
     """   
 
     test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
@@ -238,8 +246,9 @@ def many_to_many_forecasts(
         forecaster=horizon_forecaster, to_predict=to_predict, horizon=horizon, univariate=False
     )
     horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
+    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
 
-    return data_train, data_test, test_preds, horizon_preds
+    return data_train, data_test, test_preds, horizon_preds, in_sample_preds
 
 def rnn_forecasts(
         y: np.ndarray,
@@ -274,6 +283,7 @@ def rnn_forecasts(
         pd.DataFrane: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
     """
 
     T = y.shape[1]
@@ -358,6 +368,7 @@ def rnn_forecasts(
         forecaster=horizon_forecaster, to_predict=to_predict, horizon=horizon, univariate=False
     )
     horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
+    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
 
     if differentiation is not None:
         for col in horizon_preds.columns:
@@ -365,5 +376,8 @@ def rnn_forecasts(
             horizon_preds[col] = differentiators[
                 country
             ].inverse_transform_next_window(horizon_preds[col].values)
+            in_sample_preds[col] = differentiators[
+                country
+            ].inverse_transform_training(in_sample_preds[col].values)
 
     return data_train_pure, data_test_pure, test_preds, horizon_preds

@@ -37,6 +37,7 @@ def univariate_forecast(
         pd.Series: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
     """
     p = int(arima_order[0])
     d = int(arima_order[1])
@@ -101,4 +102,6 @@ def univariate_forecast(
 
     horizon_preds = pd.concat([horizon_preds, horizon_med, horizon_mean], axis=1)
 
-    return data_train, data_test, test_preds, horizon_preds
+    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, forecaster)
+
+    return data_train, data_test, test_preds, horizon_preds, in_sample_preds
