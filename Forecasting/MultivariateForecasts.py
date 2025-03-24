@@ -11,9 +11,7 @@ def multiseries_independent_forecasts(
         countries: list[str],
         train_split: float,
         start_year: int,
-        horizon: int,
-        lower_quantile: float,
-        upper_quantile: float    
+        horizon: int, 
     ):
     """
     Performs probabilistic forecasting on multiple time series without considering the relations between different time series
@@ -24,8 +22,6 @@ def multiseries_independent_forecasts(
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
 
     Returns:
         pd.DataFrame: The indexed training set
@@ -42,19 +38,16 @@ def multiseries_independent_forecasts(
     forecaster, _ = ForecastingUtils.grid_search_multiple_inputs(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=4,
-        difference_bound=2,
-        ma_bound=3,
-        lower_bound=lower_quantile,
-        upper_bound=upper_quantile,
+        lags_bound=1,
+        difference_bound=0,
+        ma_bound=0,
         countries_to_predict=countries, 
         model_type='ForecasterRecursiveMultiSeries',
         horizon=horizon
     )
 
     forecaster.fit(series=data_train)
-    test_preds = forecaster.predict_interval(steps=test_steps, interval=[
-            lower_quantile, upper_quantile], n_boot=100)
+    test_preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05,0.16,0.84,0.95], n_boot=100)
     test_med = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
     test_mean = ForecastingUtils.predict_mean(
         forecaster=forecaster, to_predict=countries, horizon=test_steps, univariate=False
@@ -62,8 +55,7 @@ def multiseries_independent_forecasts(
     test_preds = pd.concat([test_preds, test_med, test_mean], axis=1)
 
     forecaster.fit(series=data_all)
-    horizon_preds = forecaster.predict_interval(steps=horizon, interval=[
-            lower_quantile, upper_quantile], n_boot=100)
+    horizon_preds = forecaster.predict_quantiles(steps=horizon, quantiles=[0.05,0.16,0.84,0.95], n_boot=100)
     horizon_med = forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
     horizon_mean = ForecastingUtils.predict_mean(
         forecaster=forecaster, to_predict=countries, horizon=horizon, univariate=False
@@ -80,8 +72,6 @@ def many_to_one_forecasts(
         train_split: float,
         start_year: int,
         horizon: int,
-        lower_quantile: float,
-        upper_quantile: float,
         countries_to_predict: list[str] = None 
     ):
     """
@@ -93,8 +83,6 @@ def many_to_one_forecasts(
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         countries_to_predict (list[str]): The codes of countries for which predictions should be made. If None, predictions for the entire dataset are performed
         
     Returns:
@@ -105,7 +93,6 @@ def many_to_one_forecasts(
         pd.DataFrame: The in-sample prediction intervals
     """
     T = y.shape[1]
-    T_in = pd.date_range(start=f'{start_year+T-horizon}', end=f'{start_year+T}')
     T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
  
     test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
@@ -114,31 +101,28 @@ def many_to_one_forecasts(
 
     test_preds = pd.DataFrame(index=data_test.index)
     horizon_preds = pd.DataFrame(index=T_horizon)
-    in_sample_preds = pd.DataFrame(index=T_in)
 
     if countries_to_predict is not None:
         to_predict = countries_to_predict
     else:
         to_predict = countries
-
+    in_sample = []
     for country in to_predict:
         test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
             data_train=data_train,
             data_test=data_test,
-            lags_bound=4,
-            difference_bound=2,
-            ma_bound=3,
-            lower_bound=lower_quantile,
-            upper_bound=upper_quantile,
+            lags_bound=1,
+            difference_bound=0,
+            ma_bound=0,
             countries_to_predict=[country],
             model_type='ForecasterDirectMultiVariate',
             horizon=horizon
         )
 
         test_forecaster.fit(series=data_train)
-        country_test_preds = test_forecaster.predict_interval(
+        country_test_preds = test_forecaster.predict_quantiles(
             steps=test_steps,
-            interval=[lower_quantile, upper_quantile],
+            quantiles=[0.05,0.16,0.84,0.95],
             n_boot = 100
         )
         country_test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
@@ -148,9 +132,9 @@ def many_to_one_forecasts(
         country_test_preds = pd.concat([country_test_preds, country_test_med, country_test_mean], axis=1)
 
         horizon_forecaster.fit(series=data_all)
-        country_horizon_preds = horizon_forecaster.predict_interval(
+        country_horizon_preds = horizon_forecaster.predict_quantiles(
             steps=horizon,
-            interval=[lower_quantile, upper_quantile],
+            quantiles=[0.05,0.16,0.84,0.95],
             n_boot = 100
         )
         country_horizon_med = horizon_forecaster.predict_quantiles(steps=horizon, quantiles=[0.5])
@@ -159,12 +143,12 @@ def many_to_one_forecasts(
         )
         country_horizon_preds = pd.concat([country_horizon_preds, country_horizon_med, country_horizon_mean], axis=1)
         country_in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
-
+        in_sample.append(country_in_sample_preds)
         test_preds = pd.concat([test_preds, country_test_preds], axis=1)
         horizon_preds = pd.concat([horizon_preds, country_horizon_preds], axis=1)
-        in_sample_preds = pd.concat([in_sample_preds, country_in_sample_preds], axis=1)
+        
 
-    return data_train, data_test, test_preds, horizon_preds
+    return data_train, data_test, test_preds, horizon_preds, pd.concat(in_sample, axis=1)
 
 def many_to_many_forecasts(
         y: np.ndarray,
@@ -172,8 +156,6 @@ def many_to_many_forecasts(
         train_split: float,
         start_year: int,
         horizon: int,
-        lower_quantile: float,
-        upper_quantile: float,
         countries_to_predict: list[str] = None 
     ):
     """
@@ -185,8 +167,6 @@ def many_to_many_forecasts(
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         countries_to_predict (list[str]): The codes of countries for which predictions should be made. If None, predictions for the entire dataset are performed
         
     Returns:
@@ -209,11 +189,9 @@ def many_to_many_forecasts(
     test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=4,
-        difference_bound=2,
-        ma_bound=3,
-        lower_bound=lower_quantile,
-        upper_bound=upper_quantile,
+        lags_bound=1,
+        difference_bound=0,
+        ma_bound=1,
         countries_to_predict=to_predict,
         model_type='ForecastDirectMultiOutput',
         horizon=horizon
@@ -221,9 +199,9 @@ def many_to_many_forecasts(
 
     test_forecaster.fit(series=data_train)
 
-    test_preds = test_forecaster.predict_interval(
+    test_preds = test_forecaster.predict_quantiles(
         steps=test_steps, 
-        interval=[lower_quantile, upper_quantile], 
+        quantiles=[0.05,0.16,0.84,0.95], 
         n_boot=100
     )
 
@@ -235,9 +213,9 @@ def many_to_many_forecasts(
 
     horizon_forecaster.fit(series=data_all)
 
-    horizon_preds = horizon_forecaster.predict_interval(
+    horizon_preds = horizon_forecaster.predict_quantiles(
         steps=horizon,
-        interval=[lower_quantile, upper_quantile],
+        quantiles=[0.05,0.16,0.84,0.95],
         n_boot = 100
     )
 
@@ -257,8 +235,6 @@ def rnn_forecasts(
         train_split: float,
         start_year: int,
         horizon: int,
-        lower_quantile: float,
-        upper_quantile: float,
         differentiation: int = None,
         countries_to_predict: list[str] = None 
     ):
@@ -273,8 +249,6 @@ def rnn_forecasts(
         train_split (float): The split between train and test set (must be in (0,1))
         start_year (int): The start year of the time series
         horizon (int): The number of future values to be predicted
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         differentiation (int): The order of differentiation
         countries_to_predict (list[str]): The codes of countries for which predictions should be made. If None, predictions for the entire dataset are performed
         
@@ -324,21 +298,19 @@ def rnn_forecasts(
         data_train=data_train,
         data_test=data_test,
         data_all=data_all,
-        lags_bound=4,
+        lags_bound=1,
         layer_type=layer_type,
-        recurrent_layers = np.array([4,8,16,32]),
-        dense_layers = np.array([16,32,64]),
-        lower_bound=lower_quantile,
-        upper_bound=upper_quantile,
+        recurrent_layers = np.array([4]),
+        dense_layers = np.array([16]),
         countries_to_predict=to_predict,
         horizon=horizon
     )
 
     test_forecaster.fit(series=data_train)
 
-    test_preds = test_forecaster.predict_interval(
+    test_preds = test_forecaster.predict_quantiles(
         steps=test_steps, 
-        interval=[lower_quantile, upper_quantile], 
+        quantiles=[0.05, 0.16, 0.84, 0.95], 
         n_boot=100
     )
 
@@ -357,9 +329,9 @@ def rnn_forecasts(
 
     horizon_forecaster.fit(series=data_all)
 
-    horizon_preds = horizon_forecaster.predict_interval(
+    horizon_preds = horizon_forecaster.predict_quantiles(
         steps=horizon,
-        interval=[lower_quantile, upper_quantile],
+        quantiles=[0.05, 0.16, 0.84, 0.95],
         n_boot = 100
     )
 
@@ -380,4 +352,4 @@ def rnn_forecasts(
                 country
             ].inverse_transform_training(in_sample_preds[col].values)
 
-    return data_train_pure, data_test_pure, test_preds, horizon_preds
+    return data_train_pure, data_test_pure, test_preds, horizon_preds, in_sample_preds

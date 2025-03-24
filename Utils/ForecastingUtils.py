@@ -139,19 +139,20 @@ def calculate_metrics(
 
     return metrics
 
-def interval_width(preds: pd.DataFrame, country: str) -> pd.DataFrame:
+def interval_width(lower_bound: pd.Series, upper_bound: pd.Series, country: str) -> pd.DataFrame:
     """
     Calculates the length of the prediction intervals for all predicted samples for a specific country
 
     Parameters:
-        preds (pd.DataFrame): The predictions for the specified country
+        lower_bound (pd.Series): The lower bound of the interval
+        upper_bound (pd.Series): The upper bound of the interval
         country (str): The country in question
     
     Returns:
         pd.DataFrame: The data frame containing the interval lengths per annum
     """
 
-    intervals = pd.DataFrame(data=preds['upper_bound']-preds['lower_bound'], columns=[country])
+    intervals = pd.DataFrame(data=upper_bound-lower_bound, columns=[country])
     return intervals
 
 def evaluate(
@@ -335,6 +336,8 @@ def predict_in_sample(data_train: pd.DataFrame, forecaster: ForecasterBase) -> p
     remaining_steps = len(data_train)-size
     first_window = data_train[:size]
     all_preds = forecaster.predict_quantiles(steps = remaining_steps, last_window=first_window, quantiles = [0.05, 0.16, 0.84, 0.95])
+    if isinstance(forecaster, ForecasterDirectMultiVariate):
+        return all_preds
     return all_preds[:remaining_steps]
 
 def create_univariate_forecaster(
@@ -460,8 +463,6 @@ def grid_search_univariate(
         lags_bound: int,
         difference_bound: int,
         ma_bound: int,
-        lower_bound: int,
-        upper_bound: int,
         country: str   
     ) -> ForecasterRecursive:
     """
@@ -473,8 +474,6 @@ def grid_search_univariate(
         lags_bound (int): The maximum number of lags to consider
         difference_bound (int): The maximum differentiation order to consider
         ma_bound (int): The maximum rolling window size to consider
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         country (str): The country for which predictions are made
         
     Returns:
@@ -492,8 +491,8 @@ def grid_search_univariate(
     A, B, C = np.meshgrid(p_list, d_list, q_list, indexing='ij')
     configurations = np.stack([A.ravel(), B.ravel(), C.ravel()], axis=-1)
 
-    interval_lengths = np.zeros(len(configurations))
-    cov = np.zeros(len(configurations))
+    interval_lengths = np.zeros((len(configurations), 2))
+    cov = np.zeros((len(configurations),2))
 
     for i, config in enumerate(configurations):
         p = int(config[0])
@@ -501,13 +500,15 @@ def grid_search_univariate(
         q = int(config[2])
         forecaster = create_univariate_forecaster(p, d, q)
         forecaster.fit(y=data_train)
-        preds = forecaster.predict_interval(steps=test_steps, interval=[
-            lower_bound, upper_bound], n_boot=100)
-        pred_lengths = interval_width(preds, country)
-        interval_lengths[i] = pred_lengths.iloc[-1, 0]
-        cov[i] = probability_coverage(y, preds['lower_bound'], preds['upper_bound'])
+        preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05, 0.16, 0.84, 0.95], n_boot=100)
+        pred_lengths67 = interval_width(preds['q_0.16'], preds['q_0.84'], country)
+        pred_lengths90 = interval_width(preds['q_0.05'], preds['q_0.95'], country)
+        interval_lengths[i][0] = pred_lengths67.iloc[-1, 0]
+        interval_lengths[i][1] = pred_lengths90.iloc[-1, 0]
+        cov[i][0] = probability_coverage(y, preds['q_0.16'], preds['q_0.84'])
+        cov[i][1] = probability_coverage(y, preds['q_0.05'], preds['q_0.95'])
 
-    cov_ratios = cov/interval_lengths
+    cov_ratios = cov[:,0]/interval_lengths[:,0]+cov[:,1]/interval_lengths[:,1]
     ind = np.argmax(cov_ratios)
     p = int(configurations[ind][0])
     d = int(configurations[ind][1])
@@ -521,8 +522,6 @@ def grid_search_multiple_inputs(
         lags_bound: int,
         difference_bound: int,
         ma_bound: int,
-        lower_bound: int,
-        upper_bound: int,
         countries_to_predict: list[str],
         model_type: str,
         horizon: int        
@@ -536,8 +535,6 @@ def grid_search_multiple_inputs(
         lags_bound (int): The maximum number of lags to consider
         difference_bound (int): The maximum differentiation order to consider
         ma_bound (int): The maximum rolling window size to consider
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         countries_to_predict (list[str]): The countries for which predictions are made
         model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput'
         horizon (int): The number of future values to ultimately predict
@@ -560,8 +557,8 @@ def grid_search_multiple_inputs(
     configurations = np.stack([grid.ravel() for grid in grids], axis=-1)
 
     no_configs = len(configurations)
-    interval_lengths = np.zeros((no_configs, m))
-    cov = np.zeros((no_configs, m))
+    interval_lengths = np.zeros((no_configs, m, 2))
+    cov = np.zeros((no_configs, m, 2))
 
     for i, config in enumerate(configurations):
         p = int(config[0])
@@ -578,16 +575,17 @@ def grid_search_multiple_inputs(
         )
 
         forecaster.fit(series = data_train)
-        preds = forecaster.predict_interval(steps=test_steps, interval=[
-            lower_bound, upper_bound], n_boot=100)
+        preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05, 0.16, 0.84, 0.95], n_boot=100)
         for j, country in enumerate(countries_to_predict):
             y = data_test[country]
-            selected = DataUtils.select_predictions(country, preds, only_bounds=True)
-            pred_lengths = interval_width(selected, country)
-            interval_lengths[i,j] = pred_lengths.iloc[-1,0]
-            cov[i,j] = probability_coverage(y, selected['lower_bound'], selected['upper_bound'])
+            pred_lengths67 = interval_width(preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'], country)
+            pred_lengths90 = interval_width(preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'], country)
+            interval_lengths[i][j][0] = pred_lengths67.iloc[-1, 0]
+            interval_lengths[i][j][1] = pred_lengths90.iloc[-1, 0]
+            cov[i][j][0] = probability_coverage(y, preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'])
+            cov[i][j][1] = probability_coverage(y, preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'])
     
-    cov_ratios = cov/interval_lengths
+    cov_ratios = cov[:,:,0]/interval_lengths[:,:,0]+cov[:,:,1]/interval_lengths[:,:,1]
     means = np.mean(cov_ratios, axis=1)
     ind = np.argmax(means)
     config = configurations[ind]
@@ -623,8 +621,6 @@ def grid_search_rnn(
         layer_type: str,
         recurrent_layers: np.ndarray,
         dense_layers: np.ndarray,
-        lower_bound: int,
-        upper_bound: int,
         countries_to_predict: list[str],
         horizon: int
     ) -> Tuple[ForecastRNNProb, ForecastRNNProb]:
@@ -639,8 +635,6 @@ def grid_search_rnn(
         layer_type (str): The type of recurrent layer to be used, either LSTM or RNN
         recurrent_layers (np.ndarray): The possible numbers of recurrent units
         dense_layers (np.ndarray): The possible numbers of dense units
-        lower_quantile (float): The lower bound quantile to be predicted
-        upper_quantile (float): The upper bound quantile to be predicted
         countries_to_predict (list[str]): The countries for which predictions are made
         model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput'
         horizon (int): The number of future values to ultimately predict
@@ -659,8 +653,8 @@ def grid_search_rnn(
     grids = np.meshgrid(*arrays, indexing='ij')
     configurations = np.stack([grid.ravel() for grid in grids], axis=-1)
 
-    interval_lengths = np.zeros((len(configurations), m))
-    cov = np.zeros((len(configurations), m))
+    interval_lengths = np.zeros((len(configurations), m, 2))
+    cov = np.zeros((len(configurations), m, 2))
 
     for i, config in enumerate(configurations):
         p = int(config[0])
@@ -678,16 +672,17 @@ def grid_search_rnn(
         )
 
         forecaster.fit(series = data_train)
-        preds = forecaster.predict_interval(steps=test_steps, interval=[
-            lower_bound, upper_bound], n_boot=100)
+        preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05, 0.16, 0.84, 0.95], n_boot=100)
         for j, country in enumerate(countries_to_predict):
             y = data_test[country]
-            selected = DataUtils.select_predictions(country, preds, only_bounds=True)
-            pred_lengths = interval_width(selected, country)
-            interval_lengths[i,j] = pred_lengths.iloc[-1,0]
-            cov[i,j] = probability_coverage(y, selected['lower_bound'], selected['upper_bound'])
-
-    cov_ratios = cov/interval_lengths
+            pred_lengths67 = interval_width(preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'], country)
+            pred_lengths90 = interval_width(preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'], country)
+            interval_lengths[i][j][0] = pred_lengths67.iloc[-1, 0]
+            interval_lengths[i][j][1] = pred_lengths90.iloc[-1, 0]
+            cov[i][j][0] = probability_coverage(y, preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'])
+            cov[i][j][1] = probability_coverage(y, preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'])
+    
+    cov_ratios = cov[:,:,0]/interval_lengths[:,:,0]+cov[:,:,1]/interval_lengths[:,:,1]
     means = np.mean(cov_ratios, axis=1)
     ind = np.argmax(means)
     config = configurations[ind]

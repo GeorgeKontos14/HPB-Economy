@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 import networkx as nx
 
+from SCC_Replication.Variables.State import H
+
 def show_multiple_countries(
         codes: list[str],
         names: list[str],
@@ -300,19 +302,20 @@ def plot_arima_orders(arima_orders: np.ndarray):
     plt.ylabel("Frequency")
     plt.title("Frequency of Values")
     plt.legend()
-    plt.show()    
+    plt.show()
 
 def plot_forecast_intervals(
         data_train: pd.Series,
         data_test: pd.Series,
         country: str,
-        test_predictions: pd.DataFrame,
-        oos_predictions: pd.DataFrame,
-        alpha:float,
-        baseline: dict = None,
+        in_sample: pd.DataFrame = None,
+        test_preds: pd.DataFrame = None,
+        horizon_preds: pd.DataFrame = None,
         ax = None,
         title: str = None,
-        show_legend: bool = True
+        show_legend: bool = True,
+        show67: bool = True,
+        show90: bool = True
     ):
     """
     Plots the probabilistic forecast for a given country
@@ -321,26 +324,17 @@ def plot_forecast_intervals(
         data_train (pd.Series): The training part of the GDP time series
         data_test (pd.Series): The testing_part of the GDP time series
         country (str): The name of the country
-        test_predictions (pd.DataFrame): The prediction intervals on the test set
-        oos_predictions (pd.DataFrame): The out-of-sample (horizon) prediction intervals
-        alpha (float): The percentage of the prediction intervals
-        baseline (dict): The baseline values for the end of the horizon
+        in_sample (pd.DataFrame): The in-sample predictions for the time series
+        test_preds (pd.DataFrame): The predictions for the test set
+        horizon_preds (pd.DataFrame): The future predictions
         ax: The object to be used for plotting
         title (str): The title of the plot; if none, the name of the country
-        show_legend (bool): Whether or not to display a legend alongside the plot.
+        show_legend (bool): Whether or not to display a legend alongside the plot. 
+        show67 (bool): Flag indicating whether or not to plot the 67% prediction intervals
+        show90 (bool): Flag indicating whether or not to plot the 90% prediction intervals           
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 5))
-
-    last_known_ind = data_test.index[-1]
-    last_known_val = data_test.iloc[-1]
-    last_horizon_ind = oos_predictions.index[-1]
-
-    tr_mean = data_train.mean()
-
-    extended_ind = pd.date_range(start = last_known_ind, end = last_horizon_ind+pd.Timedelta(days=365*3), freq='Y')
-    const_series = pd.Series([tr_mean]*len(extended_ind), index=extended_ind)
-    const_series.plot(ax=ax, label='_nonlegend_', color='none')
 
     if title is None:
         ax.set_title(country)
@@ -348,91 +342,134 @@ def plot_forecast_intervals(
         ax.set_title(title)
 
     data_train.plot(ax=ax, label='Train', color='black')
-    data_test.plot(ax=ax, label="Test", color='g')
+    data_test.plot(ax=ax, label="Test", color='green')
 
-    ax.fill_between(
-        test_predictions.index,
-        test_predictions['lower_bound'],
-        test_predictions['upper_bound'],
-        color = 'lightskyblue',
-        alpha = 0.3,
-        label = f'{alpha}% interval (test)'
-    )
+    if in_sample is not None:
+        if show67:
+            ax.fill_between(
+                in_sample.index,
+                in_sample[f'{country}_q_0.16'],
+                in_sample[f'{country}_q_0.84'],
+                color = 'lightskyblue',
+                alpha=0.8,
+                label = f'67% interval (in-sample)'
+            )
+        if show90:
+            ax.fill_between(
+                in_sample.index,
+                in_sample[f'{country}_q_0.05'],
+                in_sample[f'{country}_q_0.95'],
+                color = 'lightskyblue',
+                alpha=0.3,
+                label = f'90% interval (in-sample)'
+            )
 
-    test_predictions['median'].plot(ax=ax, color='r', label='Median')
-    test_predictions['mean'].plot(ax=ax, color='blueviolet', label='Mean')
-    oos_predictions['median'].plot(ax=ax, color='r', label='_nonlegend_')
-    oos_predictions['mean'].plot(ax=ax, color='blueviolet', label='_nonlegend_')
-    
-    ax.fill_between(
-        oos_predictions.index,
-        oos_predictions['lower_bound'],
-        oos_predictions['upper_bound'],
-        color = 'coral',
-        alpha = 0.8,
-        label = f'{alpha}% interval (horizon)'
-    )
-
-    if baseline is not None:
-        x = pd.date_range(start=last_known_ind, end=last_horizon_ind, freq='Y')
-
-        y_median = np.linspace(last_known_val, baseline['median'], num=len(x))
-        y_mean = np.linspace(last_known_val, baseline['median'], num=len(x))
-        
-        y_median = pd.Series(y_median, index=x)
-        y_mean = pd.Series(y_mean, index=x)
-
-        y_median.plot(ax=ax, color='lime', linestyle='--', label = 'Baseline Median')
-        y_mean.plot(ax=ax, color='teal', linestyle='--', label = 'Baseline Mean')
-
+    if test_preds is not None:
+        if show67:
+            ax.fill_between(
+                test_preds.index,
+                test_preds[f'{country}_q_0.16'],
+                test_preds[f'{country}_q_0.84'],
+                color = 'orange',
+                alpha=0.8,
+                label = f'67% interval (test)'
+            )
+        if show90:
+            ax.fill_between(
+                test_preds.index,
+                test_preds[f'{country}_q_0.05'],
+                test_preds[f'{country}_q_0.95'],
+                color = 'orange',
+                alpha=0.3,
+                label = f'90% interval (test)'
+            )
+    if horizon_preds is not None:
+        horizon_preds[f'{country}_q_0.5'].plot(ax=ax, color='red', label = 'Median (horizon)')
+        horizon_preds[f'{country}_mean'].plot(ax=ax, color='blueviolet', label='Mean (horizon)')
+        if show67:
+            ax.fill_between(
+                horizon_preds.index,
+                horizon_preds[f'{country}_q_0.16'],
+                horizon_preds[f'{country}_q_0.84'],
+                color = 'coral',
+                alpha=0.8,
+                label = f'67% interval (horizon)'
+            )
+        if show90:
+            ax.fill_between(
+                horizon_preds.index,
+                horizon_preds[f'{country}_q_0.05'],
+                horizon_preds[f'{country}_q_0.95'],
+                color = 'coral',
+                alpha=0.3,
+                label = f'90% interval (horizon)'
+            )
 
     if show_legend:
-        ax.legend()
+        ax.legend()  
 
 def plot_many_predictions(
         data_train: pd.DataFrame,
         data_test: pd.DataFrame,
         country: str,
-        test_predictions: list[pd.DataFrame],
-        oos_predictions: list[pd.DataFrame],
-        alpha: float,
-        baseline: dict,
         titles: list[str],
         rows: int,
-        columns: int
+        columns: int,
+        in_sample_preds: list[pd.DataFrame] = None,
+        test_preds: list[pd.DataFrame] = None,
+        horizon_preds: list[pd.DataFrame] = None,
+        show67: bool = True,
+        show90: bool = True,
+        title: str = None
     ):
     """
-    Plots multiple predictions for the same country
+    Plot multiple predictions for the same country
 
     Parameters:
         data_train (pd.Series): The training part of the GDP time series
         data_test (pd.Series): The testing_part of the GDP time series
-        country (str): The name of the country
-        test_predictions (list[pd.DataFrame]): The prediction intervals on the test set
-        oos_predictions (list[pd.DataFrame]): The out-of-sample (horizon) prediction intervals
-        alpha (float): The percentage of the prediction intervals
-        baseline (dict): The baseline values for the end of the horizon
+        country (str): The name of the country    
         titles (list[str]): The titles of each of the subplots
         rows (int): The number of rows of plots
-        columns (int): The number of columns of plots    
+        columns (int): The number of columns of plots
+        in_sample (list[pd.DataFrame]): The in-sample predictions for the time series
+        test_preds (list[pd.DataFrame]): The predictions for the test set
+        horizon_preds (list[pd.DataFrame]): The future predictions
+        show67 (bool): Flag indicating whether or not to plot the 67% prediction intervals
+        show90 (bool): Flag indicating whether or not to plot the 90% prediction intervals  
+        title (str): The title of the plot; if none, the name of the country        
     """
     fig, axs = plt.subplots(rows, columns, figsize=(12,8))
 
     ax_list = axs.flatten()
     for i, ax in enumerate(ax_list):
+        if in_sample_preds is not None:
+            in_sample = in_sample_preds[i]
+        else:
+            in_sample = None
+        if test_preds is not None:
+            test = test_preds[i]
+        else:
+            test = None
+        if horizon_preds is not None:
+            horizon = horizon_preds[i]
+        else:
+            horizon = None
+
         plot_forecast_intervals(
-            data_train=data_train,
-            data_test=data_test,
-            country=country,
-            test_predictions=test_predictions[i],
-            oos_predictions=oos_predictions[i],
-            alpha=alpha,
-            baseline=baseline,
+            data_train, 
+            data_test, 
+            country, 
+            in_sample=in_sample, 
+            test_preds=test, 
+            horizon_preds=horizon,
             ax=ax,
             title=titles[i],
-            show_legend=False
+            show_legend=False,
+            show67=show67, 
+            show90=show90
         )
-    
+
     handles, labels = [], []
     ax = ax_list[0]
     for handle, label in zip(*ax.get_legend_handles_labels()):
@@ -440,117 +477,11 @@ def plot_many_predictions(
         labels.append(label)
 
     fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
-
-    fig.suptitle(country, fontsize=16, weight='bold')
-    plt.tight_layout(rect=[0,0.05,1,0.92])
-    plt.show()
-
-def plot_predictions_both_intervals(
-        data_train: pd.Series,
-        data_test: pd.Series,
-        country: str,
-        oos_predictions67: pd.DataFrame,
-        oos_predictions90: pd.DataFrame,
-        ax = None,
-        title: str = None,
-        show_legend: bool = True
-    ):
-    """
-    Plots the probabilistic forecast for a given country
-
-    Parameters:
-        data_train (pd.Series): The training part of the GDP time series
-        data_test (pd.Series): The testing_part of the GDP time series
-        country (str): The name of the country
-        oos_predictions67 (pd.DataFrame): The out-of-sample (horizon)  67% prediction intervals
-        oos_predictions67 (pd.DataFrame): The out-of-sample (horizon)  90% prediction intervals
-        ax: The object to be used for plotting
-        title (str): The title of the plot; if none, the name of the country
-        show_legend (bool): Whether or not to display a legend alongside the plot.
-    """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 5))
 
     if title is None:
-        ax.set_title(country)
+        fig.suptitle(country, fontsize=16)
     else:
-        ax.set_title(title)
-
-    data_train.plot(ax=ax, label='Train', color='black')
-    data_test.plot(ax=ax, label="Test", color='g')
-
-    oos_predictions67['median'].plot(ax=ax, color='r', label='_nonlegend_')
-    oos_predictions67['mean'].plot(ax=ax, color='blueviolet', label='_nonlegend_')
-    
-    ax.fill_between(
-        oos_predictions67.index,
-        oos_predictions67['lower_bound'],
-        oos_predictions67['upper_bound'],
-        color = 'coral',
-        alpha = 0.8,
-        label = f'67% interval (horizon)'
-    )
-
-    ax.fill_between(
-        oos_predictions90.index,
-        oos_predictions90['lower_bound'],
-        oos_predictions90['upper_bound'],
-        color = 'coral',
-        alpha = 0.3,
-        label = f'90% interval (horizon)'
-    )
-
-
-    if show_legend:
-        ax.legend()
-
-def plot_many_predictions_both_intervals(
-        data_train: pd.DataFrame,
-        data_test: pd.DataFrame,
-        country: str,
-        oos_predictions67: list[pd.DataFrame],
-        oos_predictions90: list[pd.DataFrame],
-        titles: list[str],
-        rows: int,
-        columns: int
-    ):
-    """
-    Plots multiple predictions for the same country
-
-    Parameters:
-        data_train (pd.Series): The training part of the GDP time series
-        data_test (pd.Series): The testing_part of the GDP time series
-        country (str): The name of the country
-        oos_predictions67 (list[pd.DataFrame]): The out-of-sample (horizon) 67% prediction intervals
-        oos_predictions90 (list[pd.DataFrame]): The out-of-sample (horizon) 90% prediction intervals
-        titles (list[str]): The titles of each of the subplots
-        rows (int): The number of rows of plots
-        columns (int): The number of columns of plots    
-    """
-    fig, axs = plt.subplots(rows, columns, figsize=(12,8))
-
-    ax_list = axs.flatten()
-    for i, ax in enumerate(ax_list):
-        plot_predictions_both_intervals(
-            data_train=data_train,
-            data_test=data_test,
-            country=country,
-            oos_predictions67=oos_predictions67[i],
-            oos_predictions90=oos_predictions90[i],
-            ax=ax,
-            title = titles[i],
-            show_legend=False
-        )
-    
-    handles, labels = [], []
-    ax = ax_list[0]
-    for handle, label in zip(*ax.get_legend_handles_labels()):
-        handles.append(handle)
-        labels.append(label)
-
-    fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
-
-    fig.suptitle(country, fontsize=16, weight='bold')
+        fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0,0.05,1,0.92])
     plt.show()
 
@@ -562,12 +493,12 @@ def plot_prediction_and_baseline(
         T: int,
         gdp: np.ndarray,
         low_freq: np.ndarray,
-        pred67: pd.DataFrame,
-        pred90: pd.DataFrame,
+        horizon_preds: pd.DataFrame,
         q05: np.ndarray,
         q16: np.ndarray,
         q84: np.ndarray,
         q95: np.ndarray,
+        title: str = None
     ):
     """
     Plot the prediction intervals of a specific model and the baseline on the same plot
@@ -580,12 +511,12 @@ def plot_prediction_and_baseline(
         T (int): The duration of the observed data
         gdp (np.ndarray): The observed GDP data for all countries
         low_freq (np.ndarray): The low-frequency trend of the observed data
-        pred67 (pd.DataFrame): The 67% prediction intervals the model has produces for the desired country
-        pred90 (pd.DataFrame): The 90% prediction intervals the model has produces for the desired country
+        horizon_preds (pd.Dataframe): The future predictions
         q05 (np.ndarray): The 5th baseline quantile
         q16 (np.ndarray): The 16th baseline quantile
         q84 (np.ndarray): The 84th baseline quantile
         q95 (np.ndarray): The 95th baseline quantile
+        title (str): The title of the plot; if none, the name of the country  
     """
     T_horizon = len(q05[:,0])
     in_sample_time = np.arange(start_year, start_year+T)
@@ -601,7 +532,7 @@ def plot_prediction_and_baseline(
         horizon_time, q16[:, ind], q84[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
     )
     ax.fill_between(
-        horizon_time, pred67['lower_bound'], pred67['upper_bound'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+        horizon_time, horizon_preds[f'{country}_q_0.16'], horizon_preds[f'{country}_q_0.84'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
     ax.set_title(f'67% Prediction Intervals')
 
@@ -612,7 +543,7 @@ def plot_prediction_and_baseline(
         horizon_time, q05[:, ind], q95[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
     )
     ax.fill_between(
-        horizon_time, pred90['lower_bound'], pred90['upper_bound'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+        horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
     ax.set_title(f'90% Prediction Intervals')
 
@@ -622,20 +553,9 @@ def plot_prediction_and_baseline(
         labels.append(label)
     
     fig.legend(handles, labels, loc='lower center', ncol=6, fontsize=10)
-    fig.suptitle(country, fontsize=16, weight='bold')
+    if title is None:
+        fig.suptitle(country, fontsize=16)
+    else:
+        fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0,0.05,1,0.92])
     plt.show()
-
-# def plot_predictions_all_samples(
-#         country: str,
-#         univariate: bool,
-#         start_year: int,
-#         T: int,
-#         T_train: int,
-#         gdp: np.ndarray,
-#         in_sample_preds: pd.DataFrame,
-#         test_preds67: pd.DataFrame,    
-#         horizon_preds67: pd.DataFrame,
-#         test_preds90: pd.DataFrame,
-#         horizon_preds90: pd.DataFrame
-#     ):

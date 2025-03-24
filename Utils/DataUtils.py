@@ -189,24 +189,29 @@ def load_forecast(
         horizon (int): The number of future values to be predicted
     
     Returns:
+        pd.DataFrame: The in-sample predictions
         pd.DataFrame: The predictions on the test set
         pd.DataFrame: The predictions on the horizon
     """
 
+    in_path = f'{dir}/in_sample.csv'
     test_path = f'{dir}/test.csv'
     horizon_path = f'{dir}/future.csv'
     
+    in_sample = pd.read_csv(in_path)
     test_preds = pd.read_csv(test_path)
     horizon_preds = pd.read_csv(horizon_path)
 
     split_ind = int(train_split*T)
+    T_in_sample = pd.date_range(start=f'{start_year+split_ind-len(in_sample)}', end=f'{start_year+split_ind}', freq='Y')
     T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
     T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
 
+    in_sample.index = T_in_sample
     test_preds.index = T_test
     horizon_preds.index = T_horizon
 
-    return test_preds, horizon_preds
+    return in_sample, test_preds, horizon_preds
 
 def load_baseline_data(
         n: int
@@ -275,6 +280,7 @@ def write_labels(
         writer.writerows(rows)
 
 def write_forecasts(
+        in_sample: pd.DataFrame,
         test_preds: pd.DataFrame,
         horizon_preds: pd.DataFrame,
         dir: str    
@@ -283,19 +289,21 @@ def write_forecasts(
     Writes predictions for test and horizon in different files
 
     Parameters:
+        in_sample (pd.DataFrame): The in-sample predictions
         test_preds (pd.DataFrame): The predictions on the test set
         horizon_preds (pd.DataFrame): The future predictions
         dir (str): The path to the directory to store the files
     """
+    in_path = f"{dir}/in_sample.csv"
     test_path = f"{dir}/test.csv"
     horizon_path = f"{dir}/future.csv"
+    in_sample.to_csv(in_path, index=False)
     test_preds.to_csv(test_path, index=False)
     horizon_preds.to_csv(horizon_path, index=False)
 
 def select_predictions(
         country: str, 
-        predictions: pd.DataFrame,
-        only_bounds: bool = False
+        predictions: pd.DataFrame
     ) -> pd.DataFrame:
     """
     Select and isolate the predictions of a specified country
@@ -303,68 +311,13 @@ def select_predictions(
     Parameters:
         country (str): The ISO-3 code of the specified country
         predictions (pd.DataFrame): The object containing predictions for multiple countries
-        only_bounds (bool): Whether or not to only take the upper and lower bounds
         
     Returns:
         pd.DataFrame: The predictions for the selected country 
     """
-    if only_bounds:
-        new_cols = {
-            country: country,
-            f'{country}_lower_bound':'lower_bound',
-            f'{country}_upper_bound':'upper_bound',
-        }
-    else:
-        new_cols = {
-            country: country,
-            f'{country}_lower_bound':'lower_bound',
-            f'{country}_upper_bound':'upper_bound',
-            f'{country}_q_0.5': 'median',
-            f'{country}_mean': 'mean'
-        }
-
-    if only_bounds:
-        selected_preds = predictions[[
-            country,f'{country}_lower_bound', f'{country}_upper_bound'
-        ]].rename(columns=new_cols)    
-    else:
-        selected_preds = predictions[[
-            country,f'{country}_lower_bound', f'{country}_upper_bound', f'{country}_q_0.5', f'{country}_mean'
-        ]].rename(columns=new_cols)
-
-    return selected_preds
-
-def select_baseline(
-        country: str,
-        stats: pd.DataFrame,
-        use_67: bool = True    
-    ) -> dict:
-    """
-    Selects the baseline predictions for a given country
-
-    Parameters:
-        country (str): The ISO-3 code of the country to select
-        stats (pd.DataFrame): The dataframe containing prediction statistics
-        use_67 (bool): Whether or not to use the 67% prediction intervals; if False, 90% prediction intervals are used
+    new_cols = []
+    for col in predictions.columns:
+        if country in col:
+            new_cols.append(col)
     
-    Returns:
-        dict: A dictionary containing the bounds, mean and median for the final step of the horizon
-    """
-    if use_67:
-        lower = 0.16
-        upper = 0.84
-    else:
-        lower = 0.05
-        upper = 0.95
-
-    row = stats.loc[country]
-    curr = row['2017Value']
-    results = {
-        'curr': curr,
-        'lower_bound': np.log(row[lower])+curr,
-        'upper_bound': np.log(row[upper])+curr,
-        'median': np.log(row[0.5])+curr,
-        'mean': np.log(row['Mean'])+curr
-    }
-
-    return results
+    return predictions[new_cols]
