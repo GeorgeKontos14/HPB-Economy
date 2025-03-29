@@ -1,11 +1,12 @@
+from math import prod
 from typing import Tuple, Union
 
 import numpy as np
 
 import pandas as pd
 
-import skforecast
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
 
 from keras.optimizers import Adam # type: ignore
@@ -16,6 +17,9 @@ from skforecast.deep_learning.utils import create_and_compile_model
 from skforecast.direct import ForecasterDirectMultiVariate
 from skforecast.preprocessing import RollingFeatures
 from skforecast.recursive import ForecasterRecursive, ForecasterRecursiveMultiSeries
+
+from hyperopt import hp, fmin, tpe, Trials
+from hyperopt.early_stop import no_progress_loss
 
 from Forecasting.ForecasterMultioutput import ForecastDirectMultiOutput
 from Forecasting.ForecasterRNNProb import ForecastRNNProb
@@ -205,7 +209,9 @@ def interval_overlap_ratio(
         T_horizon: int, 
         preds: pd.DataFrame, 
         baseline_low: np.ndarray, 
-        baseline_up: np.ndarray
+        baseline_up: np.ndarray,
+        country: str,
+        use67: bool = True
     ) -> float:
     """
     Calculate the interval overlap ratio between the predictions of a model and the baseline for a specific country
@@ -215,13 +221,19 @@ def interval_overlap_ratio(
         preds (pd.DataFrame): The predictions for that country
         baseline_low (np.ndarray): The lower bound of the baseline prediction interval
         baseline_up (np.ndarray): The upper bound of the baseline prediction interval
+        country (str): The country for which to make the calculations
+        use67 (bool): Flag indicating whether to use the 67% intervals
 
     Returns:
         float: The (average) interval overlap ratio across the predictions of that country 
     """
     ratio = 0
-    L = preds['lower_bound'].to_numpy()
-    U = preds['upper_bound'].to_numpy()
+    if use67:
+        L = preds[f'{country}_q_0.16'].to_numpy()
+        U = preds[f'{country}_q_0.84'].to_numpy()
+    else:
+        L = preds[f'{country}_q_0.05'].to_numpy()
+        U = preds[f'{country}_q_0.95'].to_numpy()        
     for i in range(T_horizon):
         num = max(0, min(U[i], baseline_up[i])-max(L[i], baseline_low[i]))
         denom = max(U[i], baseline_up[i])-min(L[i], baseline_low[i])
@@ -233,7 +245,9 @@ def relative_interval_width_ratio(
         T_horizon: int, 
         preds: pd.DataFrame, 
         baseline_low: np.ndarray, 
-        baseline_up: np.ndarray
+        baseline_up: np.ndarray,
+        country: str,
+        use67: bool = True
     ) -> float:
     """
     Calculate the relative interval width ratio between the predictions of a model and the baseline for a specific country
@@ -243,13 +257,19 @@ def relative_interval_width_ratio(
         preds (pd.DataFrame): The predictions for that country
         baseline_low (np.ndarray): The lower bound of the baseline prediction interval
         baseline_up (np.ndarray): The upper bound of the baseline prediction interval
+        country (str): The country for which to make the calculations
+        use67 (bool): Flag indicating whether to use the 67% intervals
 
     Returns:
         float: The (average) relative interval width ratio across the predictions of that country 
     """
     ratio = 0
-    L = preds['lower_bound'].to_numpy()
-    U = preds['upper_bound'].to_numpy()
+    if use67:
+        L = preds[f'{country}_q_0.16'].to_numpy()
+        U = preds[f'{country}_q_0.84'].to_numpy()
+    else:
+        L = preds[f'{country}_q_0.05'].to_numpy()
+        U = preds[f'{country}_q_0.95'].to_numpy()  
     for i in range(T_horizon):
         num = U[i]-L[i]
         denom = baseline_up[i]-baseline_low[i]
@@ -260,8 +280,7 @@ def relative_interval_width_ratio(
 def compare_to_baseline(
         countries: list[str],
         T_horizon: int,
-        preds67: pd.DataFrame,
-        preds90: pd.DataFrame,
+        horizon_preds: pd.DataFrame,
         q05: np.ndarray,
         q16: np.ndarray,
         q84: np.ndarray,
@@ -292,16 +311,16 @@ def compare_to_baseline(
     overlap_ratios90 = np.zeros(n)
     width_ratios90 = np.zeros(n)
     for j, country in enumerate(countries):
-        pred67 = DataUtils.select_predictions(country, preds67)
-        pred90 = DataUtils.select_predictions(country, preds90)
+        pred67 = horizon_preds[[f'{country}_q_0.16', f'{country}_q_0.84']]
+        pred90 = horizon_preds[[f'{country}_q_0.05', f'{country}_q_0.95']]
         baseline05 = q05[:, j]
         baseline16 = q16[:, j]
         baseline84 = q84[:, j]
         baseline95 = q95[:, j]
-        overlap_ratios67[j] = interval_overlap_ratio(T_horizon, pred67, baseline16, baseline84)
-        width_ratios67[j] = relative_interval_width_ratio(T_horizon, pred67, baseline16, baseline84)
-        overlap_ratios90[j] = interval_overlap_ratio(T_horizon, pred90, baseline05, baseline95)
-        width_ratios90[j] = relative_interval_width_ratio(T_horizon, pred90, baseline05, baseline95)
+        overlap_ratios67[j] = interval_overlap_ratio(T_horizon, pred67, baseline16, baseline84, country)
+        width_ratios67[j] = relative_interval_width_ratio(T_horizon, pred67, baseline16, baseline84, country)
+        overlap_ratios90[j] = interval_overlap_ratio(T_horizon, pred90, baseline05, baseline95, country, use67 =  False)
+        width_ratios90[j] = relative_interval_width_ratio(T_horizon, pred90, baseline05, baseline95, country, use67 =  False)
 
     print("Interval Overlap Ratios")
     print(f"67% Prediction Intervals")
@@ -711,3 +730,202 @@ def grid_search_rnn(
     )
 
     return forecaster_test, forecaster_horizon
+
+def tree_parzen_univariate(
+        data_train: pd.Series,
+        data_test: pd.Series,
+        lags_bound: int,
+        difference_bound: int,
+        average_bound: int,
+        country: str
+    )-> Tuple[ForecasterRecursive, dict]:
+    """
+    Performs hyperparameter tuning for univriate forecasts using tree-structured Parzen estimation
+
+    Parameters:
+        data_train (pd.Series): The training set
+        data_test (pd.Series): The test set
+        lags_bound (int): The maximum number of lags to consider
+        difference_bound (int): The maximum differentiation order to consider
+        average_bound (int): The maximum rolling window size to consider
+        country (str): The country for which predictions are made
+
+    Returns:
+        ForecasterRecursive: The best performing forecaster
+        dict: The best parameters      
+    """
+
+    test_steps = len(data_test)
+    search_space = {
+        'p': hp.quniform('p', 1, lags_bound, 1),
+        'd': hp.quniform('d', 0, difference_bound, 1),
+        'q': hp.quniform('q', 0, average_bound, 1)
+    }
+    N = average_bound*difference_bound*(lags_bound-1)
+
+    if N <= 250:
+        stop = 6
+    elif N < 750:
+        stop = 10
+    else:
+        stop = 15    
+    
+    def objective(params):
+        p, d, q = int(params['p']), int(params['d']), int(params['q'])
+        model = create_univariate_forecaster(p, d, q)
+        model.fit(y=data_train)
+        q_preds = model.predict_quantiles(
+            steps=test_steps,
+            quantiles=[0.05, 0.16, 0.5, 0.84, 0.95]
+        )
+        preds = model.predict(steps=test_steps)
+        p_lengths_67 = interval_width(q_preds['q_0.16'], q_preds['q_0.84'], country)
+        p_lengths_90 = interval_width(q_preds['q_0.05'], q_preds['q_0.95'], country)
+        lengths_67 = p_lengths_67.iloc[-1,0]
+        lengths_90 = p_lengths_90.iloc[-1,0]
+        cov_67 = probability_coverage(data_test, q_preds['q_0.16'], q_preds['q_0.84'])
+        cov_90 = probability_coverage(data_test, q_preds['q_0.05'], q_preds['q_0.95'])        
+        int_score_67 = np.sqrt(lengths_67)*np.abs(cov_67-0.67)
+        int_score_90 = np.sqrt(lengths_90)*np.abs(cov_90-0.9)
+        loss_median = pinball_loss(data_test, q_preds['q_0.5'], 0.5)
+        mse = mean_squared_error(data_test, preds)
+        return {'loss': loss_median+(int_score_67+int_score_90)/2+0.2*mse, 'status': 'ok'}
+    
+    trials = Trials()
+    best_params = fmin(
+        fn = objective,
+        space = search_space,
+        algo = tpe.suggest,
+        max_evals = int(0.2*N),
+        trials=trials,
+        early_stop_fn=no_progress_loss(stop)
+    )
+
+    lags = int(best_params['p'])
+    difference = int(best_params['d'])
+    ma = int(best_params['q'])  
+
+    forecaster = create_univariate_forecaster(lags, difference, ma)
+
+    return forecaster, best_params  
+
+
+def tree_parzen_multivariate(
+        data_train: pd.DataFrame,
+        data_test: pd.DataFrame,
+        lags_bound: Union[int, list[int]],
+        difference_bound: int,
+        average_bound: int,
+        countries_to_predict: list[str],
+        model_type: str,
+        horizon: int
+    )-> Tuple[ForecasterBase, ForecasterBase]:
+    """
+    Performs hyperparameter tuning for multivariate forecasts using tree-structured Parzen estimation
+
+    Parameters:
+        data_train (pd.DataFrame): The training set
+        data_test (pd.DataFrame): The test set
+        lags_bound (int): The maximum number of lags to consider
+        difference_bound (int): The maximum differentiation order to consider
+        average_bound (int): The maximum rolling window size to consider
+        countries_to_predict (list[str]): The countries for which predictions are made
+        model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput'
+        horizon (int): The number of future values to ultimately predict
+
+    Returns:
+        ForecasterBase: The forecaster for the test set
+        ForecasterBase: The forecaster for the horizon
+        dict: The best parameters 
+    """
+
+    test_steps = len(data_test)
+    n = data_train.shape[1]
+    m = len(countries_to_predict)
+
+    search_space = {
+        'd': hp.quniform('d', 0, difference_bound, 1),
+        'q': hp.quniform('q', 0, average_bound, 1),
+    }
+    N = difference_bound*average_bound
+    if isinstance(lags_bound, list):
+        search_space['p'] = [hp.choice(f"p_{i}", list(range(1,bound))) for i, bound in enumerate(lags_bound)]
+        N = N*prod([bound-1 for bound in lags_bound])
+    else:
+        search_space['p'] = [hp.choice(f"p_{i}", list(range(1,lags_bound))) for i in range(n)]
+        N = N*(lags_bound-1)**n
+
+    if N <= 250:
+        stop = 6
+    elif N < 750:
+        stop = 10
+    else:
+        stop = 15    
+
+    def objective(params):
+        p, d, q = params['p'], int(params['d']), int(params['q'])
+        model = create_multivariate_forecaster(
+            p, d, q, model_type, test_steps, countries_to_predict
+        )
+        model.fit(series=data_train)
+        int_score_67 = 0
+        int_score_90 = 0
+        loss_median = 0
+        q_preds = model.predict_quantiles(
+            steps=test_steps,
+            quantiles=[0.05,0.16,0.5,0.84, 0.95],
+            n_boot=100
+        )
+        preds = model.predict(steps=test_steps)
+        mse = 0        
+        for country in countries_to_predict:
+            y = data_test[country]
+            p_lengths_67 = interval_width(q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'], country)
+            p_lengths_90 = interval_width(q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'], country)
+            lengths_67 = p_lengths_67.iloc[-1,0]
+            lengths_90 = p_lengths_90.iloc[-1,0]
+            cov_67 = probability_coverage(y, q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'])
+            cov_90 = probability_coverage(y, q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'])
+            int_score_67 += np.sqrt(lengths_67)*np.abs(cov_67-0.67)
+            int_score_90 += np.sqrt(lengths_90)*np.abs(cov_90-0.9)
+            loss_median += pinball_loss(y, q_preds[f'{country}_q_0.5'], 0.5)
+            mse += mean_squared_error(y, preds[country]) 
+        int_score_67 = int_score_67/m
+        int_score_90 = int_score_90/m
+        loss_median = loss_median/m
+        mse = mse/m
+        return {'loss': loss_median+(int_score_67+int_score_90)/2+0.2*mse, 'status': 'ok'}
+
+    trials = Trials()
+    best_params = fmin(
+        fn = objective,
+        space = search_space,
+        algo = tpe.suggest,
+        max_evals = int(0.2*N),
+        trials=trials,
+        early_stop_fn=no_progress_loss(stop)
+    )
+
+    lags = [int(best_params[f"p_{i}"])+1 for i in range(n)]
+    difference = int(best_params['d'])
+    ma = int(best_params['q'])
+
+    forecaster_test = create_multivariate_forecaster(
+        p = lags,
+        d = difference,
+        q = ma,
+        model_type=model_type,
+        steps = test_steps,
+        level = countries_to_predict
+    )
+
+    forecaster_horizon = create_multivariate_forecaster(
+        p = lags,
+        d = difference,
+        q = ma,
+        model_type = model_type,
+        steps = horizon,
+        level = countries_to_predict
+    )
+
+    return forecaster_test, forecaster_horizon, best_params

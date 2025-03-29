@@ -35,12 +35,12 @@ def multiseries_independent_forecasts(
         countries=countries, y=y, start_year=start_year, train_split=train_split
     )
 
-    forecaster, _ = ForecastingUtils.grid_search_multiple_inputs(
+    forecaster, _, _ = ForecastingUtils.tree_parzen_multivariate(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=1,
-        difference_bound=0,
-        ma_bound=0,
+        lags_bound=4,
+        difference_bound=2,
+        average_bound=3,
         countries_to_predict=countries, 
         model_type='ForecasterRecursiveMultiSeries',
         horizon=horizon
@@ -108,12 +108,12 @@ def many_to_one_forecasts(
         to_predict = countries
     in_sample = []
     for country in to_predict:
-        test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
+        test_forecaster, horizon_forecaster, _ = ForecastingUtils.tree_parzen_multivariate(
             data_train=data_train,
             data_test=data_test,
-            lags_bound=1,
-            difference_bound=0,
-            ma_bound=0,
+            lags_bound=4,
+            difference_bound=2,
+            average_bound=3,
             countries_to_predict=[country],
             model_type='ForecasterDirectMultiVariate',
             horizon=horizon
@@ -186,12 +186,12 @@ def many_to_many_forecasts(
     else:
         to_predict = countries
 
-    test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_multiple_inputs(
+    test_forecaster, horizon_forecaster, _ = ForecastingUtils.tree_parzen_multivariate(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=1,
-        difference_bound=0,
-        ma_bound=1,
+        lags_bound=4,
+        difference_bound=2,
+        average_bound=3,
         countries_to_predict=to_predict,
         model_type='ForecastDirectMultiOutput',
         horizon=horizon
@@ -282,6 +282,8 @@ def rnn_forecasts(
                             for country in countries}
         differentiators_train = {country: TimeSeriesDifferentiator(order=differentiation)
                             for country in countries}
+        differentiators_in_sample = {country: TimeSeriesDifferentiator(order=differentiation)
+                            for country in countries}
         differenced = np.zeros_like(y)
         for i, country in enumerate(countries):
             differenced[i] = differentiators[
@@ -343,13 +345,18 @@ def rnn_forecasts(
     in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
 
     if differentiation is not None:
+        size = horizon_forecaster.last_window_.shape[0]
+        for country in countries:
+            first_window = data_train[country][:size]
+            differentiators_in_sample[country].fit(first_window.to_numpy())
         for col in horizon_preds.columns:
             country = col[:3]
             horizon_preds[col] = differentiators[
                 country
             ].inverse_transform_next_window(horizon_preds[col].values)
-            in_sample_preds[col] = differentiators[
+        for col in in_sample_preds.columns:
+            in_sample_preds[col] = differentiators_in_sample[
                 country
-            ].inverse_transform_training(in_sample_preds[col].values)
+            ].inverse_transform_next_window(in_sample_preds[col].values)
 
     return data_train_pure, data_test_pure, test_preds, horizon_preds, in_sample_preds

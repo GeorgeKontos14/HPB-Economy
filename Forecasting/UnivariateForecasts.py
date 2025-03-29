@@ -36,13 +36,13 @@ def univariate_forecast(
         y = y, start_year = start_year, train_split = train_split
     )
 
-    forecaster = ForecastingUtils.grid_search_univariate(
+    forecaster, _ = ForecastingUtils.tree_parzen_univariate(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=1,
-        difference_bound=0,
-        ma_bound=1,
-        country=country
+        lags_bound=4,
+        difference_bound=2,
+        average_bound=3,
+        country = country
     )
 
     forecaster.fit(y=data_train)
