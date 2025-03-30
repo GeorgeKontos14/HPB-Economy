@@ -1,4 +1,3 @@
-from re import M
 import numpy as np
 
 import pandas as pd
@@ -9,13 +8,12 @@ import matplotlib.pyplot as plt
 
 import networkx as nx
 
-from SCC_Replication.Variables.State import H
+import Constants
 
 def show_multiple_countries(
         codes: list[str],
         names: list[str],
         df: pd.DataFrame,
-        start_year: int,
         duration: int    
     ):
     """
@@ -25,7 +23,6 @@ def show_multiple_countries(
         codes (list[str]): The ISO3 country codes of the selected countries
         names (list[str]): The names of the selected countries
         df (pd.DataFrame): The full dataset
-        start_year (int): The first year of the observations
         duration (int): The number of observations for each time series
     """
     selected_data = [df.loc[code].to_list() for code in codes]
@@ -38,7 +35,7 @@ def show_multiple_countries(
     plt.figure(figsize=(20,5))
     plt.title(f"GDP for {countries_str}")
     for i, row in enumerate(selected_gdp):
-        plt.plot(range(start_year, start_year+duration), row, label=names[i])
+        plt.plot(range(Constants.start_year, Constants.start_year+duration), row, label=names[i])
     plt.xlabel('Year')
     plt.ylabel('GDP')
     plt.show()
@@ -46,7 +43,7 @@ def show_multiple_countries(
     plt.figure(figsize=(20,5))
     plt.title(f"Population for {countries_str}")
     for i, row in enumerate(selected_pop):
-        plt.plot(range(start_year, start_year+duration), row, label=names[i])
+        plt.plot(range(Constants.start_year, Constants.start_year+duration), row, label=names[i])
     plt.xlabel('Year')
     plt.ylabel('Population')
     plt.show()
@@ -54,7 +51,7 @@ def show_multiple_countries(
     plt.figure(figsize=(20,5))
     plt.title(f"Currency for {countries_str}")
     for i, row in enumerate(selected_cur):
-        plt.plot(range(start_year, start_year+duration), row, label=names[i])
+        plt.plot(range(Constants.start_year, Constants.start_year+duration), row, label=names[i])
     plt.xlabel('Year')
     plt.ylabel('Currency')
 
@@ -65,8 +62,6 @@ def plot_clusters(
         labels: np.ndarray,
         rows: int,
         columns: int,
-        start_year: int,
-        T: int,
         title: str = None
     ):
     """
@@ -79,11 +74,9 @@ def plot_clusters(
         labels (np.ndarray): The labels that the clustering algorithm assigns to the data
         rows (int): The number of rows of subplots
         columns (int): The number of columns of subplots 
-        start_year (int): The first year of observations
-        T (int): The duration of the time series
         title (str): The title to be used in the graph
     """
-    time = np.arange(start_year, start_year+T)
+    time = np.arange(Constants.start_year, Constants.start_year+Constants.T)
     plt.figure(figsize=(20, 10))
     if title is not None:
         plt.suptitle(title)
@@ -105,8 +98,6 @@ def show_clustering(
         score: float,
         rows: int,
         columns: int,
-        start_year: int,
-        T: int,
         title: str = None
     ) -> list[list[str]]:
     """
@@ -121,14 +112,12 @@ def show_clustering(
         score (float): The silhouette score of the clustering
         rows (int): The number of rows of subplots
         columns (int): The number of columns of subplots
-        start_year (int): The first year of observations
-        T (int): The duration of the time series
         title (str): The title to be used in the graph
     
     Returns:
         list[list[str]]: The list containing the country names per cluster
     """
-    plot_clusters(k, data, cluster_centers, labels, rows, columns, start_year, T, title)
+    plot_clusters(k, data, cluster_centers, labels, rows, columns, title)
 
     clusters = summarize_clustering(countries, k, labels, score)
     
@@ -167,8 +156,6 @@ def summarize_clustering(
 def plot_centroids_outliers(
         cluster_centers: np.ndarray,
         outliers: np.ndarray,
-        start_year: int,
-        T: int,
         title: str = None
     ):
     """
@@ -181,7 +168,7 @@ def plot_centroids_outliers(
         T (int): The duration of the time series
         title (str): The title to be used in the graph
     """
-    time = np.arange(start_year, start_year+T)
+    time = np.arange(Constants.start_year, Constants.start_year+Constants.T)
 
     plt.figure(figsize=(20,5))
     if title is not None:
@@ -385,7 +372,6 @@ def plot_forecast_intervals(
             )
     if horizon_preds is not None:
         horizon_preds[f'{country}_q_0.5'].plot(ax=ax, color='red', label = 'Median (horizon)')
-        horizon_preds[f'{country}_mean'].plot(ax=ax, color='blueviolet', label='Mean (horizon)')
         if show67:
             ax.fill_between(
                 horizon_preds.index,
@@ -489,8 +475,6 @@ def plot_prediction_and_baseline(
         country: str,
         model_type: str,
         ind: int,
-        start_year: int,
-        T: int,
         gdp: np.ndarray,
         low_freq: np.ndarray,
         horizon_preds: pd.DataFrame,
@@ -507,8 +491,6 @@ def plot_prediction_and_baseline(
         country (str): The name of the country
         model_type (str): The type of model that was used for the predictions
         ind (int): The index corresponding to the country
-        start_year (int): The start year of the observed data
-        T (int): The duration of the observed data
         gdp (np.ndarray): The observed GDP data for all countries
         low_freq (np.ndarray): The low-frequency trend of the observed data
         horizon_preds (pd.Dataframe): The future predictions
@@ -519,8 +501,8 @@ def plot_prediction_and_baseline(
         title (str): The title of the plot; if none, the name of the country  
     """
     T_horizon = len(q05[:,0])
-    in_sample_time = np.arange(start_year, start_year+T)
-    horizon_time = np.arange(start_year+T, start_year+T+T_horizon)
+    in_sample_time = np.arange(Constants.start_year, Constants.start_year+Constants.T)
+    horizon_time = np.arange(Constants.start_year+Constants.T, Constants.start_year+Constants.T+T_horizon)
 
     fig, axs = plt.subplots(2, 1, figsize=(14,10))
     ax_list = axs.flatten()

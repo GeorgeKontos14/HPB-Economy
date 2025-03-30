@@ -14,21 +14,21 @@ from scipy.sparse.csgraph import laplacian
 
 from tslearn.neighbors import KNeighborsTimeSeries
 
+import Constants
+
 def knn_graph(
-        n: int, 
         df: pd.DataFrame
     ) -> np.ndarray:
     """
     Constructs the k-nearest neighbors graph of the dataset. k is determined heuristically as floor(n**0.5).
 
     Parameters:
-        n (int): The number of points in the dataset
         df (pd.Dataframe): The dataset for which the graph is constructed
 
     Returns:
     np.ndarray: The n X n weighted adjacency matrix representing the k-nn graph of the dataset.
     """
-    n_neighbors = int(np.floor(n**0.5))
+    n_neighbors = int(np.floor(Constants.n**0.5))
     W = kneighbors_graph(df, n_neighbors=n_neighbors, mode='distance', metric='euclidean')
 
     return W.toarray()
@@ -63,20 +63,18 @@ def epsilon_graph(
     return np.where(S < eps, S, 0)
 
 def dtw_knn_graph(
-        n: int, 
         df: pd.DataFrame
     ) -> np.ndarray:
     """
     Constructs the k-nearest neighbors graph of the dataset using DTW as a distance measure. k is determined heuristically as floor(n**0.5).
 
     Parameters:
-        n (int): The number of points in the dataset
         df (pd.Dataframe): The dataset for which the graph is constructed
 
     Returns:
     np.ndarray: The n X n weighted adjacency matrix representing the k-nn graph of the dataset.
     """
-    n_neighbors = int(np.floor(n**0.5))
+    n_neighbors = int(np.floor(Constants.n**0.5))
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         W = KNeighborsTimeSeries(n_neighbors=n_neighbors, metric='dtw').fit(
@@ -85,7 +83,6 @@ def dtw_knn_graph(
     return W.toarray()
 
 def laplacian_eigen(
-        n: int,
         W: np.ndarray,
         normalized: bool = True,
         verbose: bool = False
@@ -110,13 +107,12 @@ def laplacian_eigen(
     if verbose:
         plt.figure(figsize=(15,7))
         plt.title("(Ordered) Eigenvalue Plot of the Laplacian Matrix")
-        plt.stem(range(n), np.sort(eigvals.real))
+        plt.stem(range(Constants.n), np.sort(eigvals.real))
         plt.show()
     
     return eigvals, eigvecs
 
 def smallest_eigenvecs(
-        n: int,
         K: int,
         eigvals: np.ndarray,
         eigvecs: np.ndarray,
@@ -126,7 +122,6 @@ def smallest_eigenvecs(
     Creates the final spectral clustering dataset by only maintaining the K eigenvectors that correspond to the K smallest eigenvalues of the Laplacian matrix
     
     Parameters:
-        n (int): The number of nodes in the graph
         K (int): The nuber of eigenvectors to be kept
         eigvals (np.ndarray): The eigenvalues of the Laplacian Matrix
         eigvecs (np.ndarray): The eigenvectors of the Laplacian Matrix
@@ -136,7 +131,7 @@ def smallest_eigenvecs(
         np.ndarray: The n X K matrix H that is used for the final step of spectral clustering
     """
     indices = np.argsort(eigvals)[:K]
-    H = np.zeros((n, K))
+    H = np.zeros((Constants.n, K))
     
     for i, ind in enumerate(indices):
         H[:, i] = eigvecs[ind].real

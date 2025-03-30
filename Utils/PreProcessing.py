@@ -10,6 +10,8 @@ from sklearn.impute import KNNImputer
 
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 
+import Constants
+
 def fill_data(arr: np.ndarray, neighbors: int = 3) -> np.ndarray:
     """
     Fills empty values in the input array using a KNN Imputer
@@ -86,7 +88,6 @@ def preprocess(
         gdp: np.ndarray, 
         pop: np.ndarray, 
         currency: np.ndarray,
-        start_year: int
     ):
     """
     Constructs the final dataset to be used for the spectral clustering algorithm
@@ -96,21 +97,20 @@ def preprocess(
         gdp (np.ndarray): The matrix containing the annual GDP per capita for each country
         pop (np.ndarray): The matrix containing the annual population of each country
         currency (np.ndarray): The matrix containing the annual bilateral exchange rate of each country's currency and the US Dollar
-        start_year (int): The start year of the data
 
     Returns:
         pd.DataFrame: The dataset where each country is represented by the concatenation of the three time series (gdp, population and currency exchange rate)
         pd.DataFrame: The scaled version of the dataset
     """
     scaler = StandardScaler()
-    gdp_columns = {f"GDP {i+start_year}": gdp[:,i] for i in range(gdp.shape[1])}
+    gdp_columns = {f"GDP {i+Constants.start_year}": gdp[:,i] for i in range(gdp.shape[1])}
     gdp_df = pd.DataFrame(gdp_columns)
 
-    pop_columns = {f"Population {i+start_year}": pop[:, i] for i in range(pop.shape[1])}
+    pop_columns = {f"Population {i+Constants.start_year}": pop[:, i] for i in range(pop.shape[1])}
     pop_df = pd.DataFrame(pop_columns)
 
     currency_data = fill_data(currency)
-    currency_columns = {f"Currency {i+start_year}": currency_data[:, i] for i in range(currency_data.shape[1])}
+    currency_columns = {f"Currency {i+Constants.start_year}": currency_data[:, i] for i in range(currency_data.shape[1])}
     currency_df = pd.DataFrame(currency_columns)
 
     df = pd.concat([gdp_df, pop_df, currency_df], axis=1)
@@ -123,8 +123,6 @@ def preprocess(
 def preprocess_onlyGDP(
         countries: list[str],
         gdp: np.ndarray, 
-        start_year: int,
-        T: int,
         zero_mean: bool = True
     ):
     """
@@ -133,8 +131,6 @@ def preprocess_onlyGDP(
     Parameters:
         countries (list[str]): The ISO3 code for each country (to be used as indices)
         gdp (np.ndarray): The matrix containing the annual GDP per capita for each country
-        start_year (int): The start year of the data
-        T (int): The amount of years for which data is collected
         zero_mean (bool): Whether or not to change the time series mean to zero
 
     Returns:
@@ -143,7 +139,7 @@ def preprocess_onlyGDP(
         np.ndarray: The scaled version of the dataset in a numpy array
     """
     scaler = TimeSeriesScalerMeanVariance()
-    df = pd.DataFrame({start_year+i: gdp[:, i] for i in range(T)})
+    df = pd.DataFrame({Constants.start_year+i: gdp[:, i] for i in range(Constants.T)})
     df.index = countries
     scaled_data = np.squeeze(scaler.fit_transform(df))
     if not zero_mean:
@@ -154,41 +150,33 @@ def preprocess_onlyGDP(
 
 
 def make_indexes(
-        start_year: int,
         split_ind: int,
-        T: int
     ) -> Tuple[pd.DatetimeIndex, pd.DatetimeIndex, pd.DatetimeIndex]:
     """
     Creates datetime indices for the specified period
 
     Parameters:
-        start_year (int): The start year of the time series
         split_ind (int): The index where the training and test sets are split
-        T (int): The length of the time series
 
     Returns:
         pd.DatetimeIndex: The index of the training set
         pd.DatetimeIndex: The index of the test set
         pd.DatetimeIndex: The index of the entire dataset
     """
-    T_train = pd.date_range(start=f'{start_year}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_all = pd.date_range(start=f'{start_year}', end=f'{start_year+T}', freq='Y')
+    T_train = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+split_ind}', freq='Y')
+    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='Y')
+    T_all = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+Constants.T}', freq='Y')
 
     return T_train, T_test, T_all
 
 def preprocess_univariate_forecast(
         y: np.ndarray,
-        start_year: int,
-        train_split: float
     ) -> Tuple[int, pd.Series, pd.Series, pd.Series]:
     """
     Creates a training and a test set for a given dataset.
 
     Parameters:
         y (np.ndarray): The dataset
-        start_year (int): The start year of the time series
-        train_split (float): The split between train and test set (must be in (0,1))
     
     Returns:
         int: The number of test steps
@@ -198,11 +186,11 @@ def preprocess_univariate_forecast(
     """
 
     T = len(y)
-    split_ind = int(train_split*T)
+    split_ind = int(Constants.train_split*T)
     test_steps = T-split_ind
 
     T_train, T_test, T_all = make_indexes(
-        start_year=start_year, split_ind=split_ind, T=T
+        start_year=Constants.start_year, split_ind=split_ind, T=T
     )
 
     data_train = pd.Series(y[:split_ind], index=T_train)
@@ -214,8 +202,6 @@ def preprocess_univariate_forecast(
 def preprocess_multivariate_forecast(
         countries: list[str],
         y: np.ndarray,
-        start_year: int,
-        train_split: float
     ) -> Tuple[int, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Creates a training and a test set for a given dataset.
@@ -223,8 +209,6 @@ def preprocess_multivariate_forecast(
     Parameters:
         countries (list[str]): The countries in the dataset
         y (np.ndarray): The dataset
-        start_year (int): The start year of the time series
-        train_split (float): The split between train and test set (must be in (0,1))
     
     Returns:
         int: The number of test steps
@@ -233,11 +217,11 @@ def preprocess_multivariate_forecast(
         pd.DataFrame: The dataset in a dataframe form
     """
     T = y.shape[1]
-    split_ind = int(T*train_split)
+    split_ind = int(T*Constants.train_split)
     test_steps = T-split_ind
 
     T_train, T_test, T_all = make_indexes(
-        start_year=start_year, split_ind=split_ind, T=T
+        start_year=Constants.start_year, split_ind=split_ind, T=T
     )
 
     data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)

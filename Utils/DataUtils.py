@@ -10,30 +10,11 @@ import csv
 
 import geopandas as gp
 
-def load_clustering_data(
-        names_path: str,
-        gdp_path: str,
-        population_path: str,
-        currency_path: str,
-        map_path: str,
-        n: int,
-        T_gdp: int,
-        T_pop: int,
-        T_currency: int
-    ):
+import Constants
+
+def load_clustering_data():
     """
     Loads all data required for clustering from .csv and .txt files
-
-    Parameters:
-        names_path (str): The path to the file containing each country's ISO3 code
-        gdp_path (str): The path to the file containing each country's GDP data
-        population_path (str): The path to the file containing each country's population data
-        currency_path (str): The path to the file containing each country's currency exchange rate data
-        map_path (str): The path to the map data
-        n (int): The number of countries in the dataset
-        T_gdp (int): The amount of years GDP data is available for (ending in 2017)
-        T_pop (int): The amount of years population data is available for (ending in 2017)
-        T_currency (int): The amount of years currency exchange rate data is available for (ending in 2017)
 
     Returns:
         list[str]: The list of ISO3 codes for each country in the dataset
@@ -43,53 +24,46 @@ def load_clustering_data(
         gd.GeoDataFrame: The map, used for visualization of clustering results
     """
     names = []
-    with open(names_path, 'r') as file:
+    with open(Constants.names_path, 'r') as file:
         rows = file.readlines()
         for row in rows:
             names.append(row[:3])
 
-    gdp = np.zeros((n,T_gdp))
-    with open(gdp_path, 'r') as file:
+    gdp = np.zeros((Constants.n,Constants.T_gdp))
+    with open(Constants.gdp_path, 'r') as file:
         rows = csv.reader(file)
         for i, row in enumerate(rows):
             for j, val in enumerate(row):
                 gdp[j][i] = float(val)
 
-    pop = np.zeros((n, T_pop))
-    with open(population_path, 'r') as file:
+    pop = np.zeros((Constants.n, Constants.T_pop))
+    with open(Constants.population_path, 'r') as file:
         rows = csv.reader(file)
         for i, row in enumerate(rows):
             for j, val in enumerate(row):
                 pop[j][i] = float(val)
 
-    currency = np.zeros((n, T_currency))
-    with open(currency_path, 'r') as file:
+    currency = np.zeros((Constants.n, Constants.T_currency))
+    with open(Constants.currency_path, 'r') as file:
         rows = csv.reader(file)
         for i, row in enumerate(rows):
             for j, val in enumerate(row):
                 currency[i][j] = float(val)
 
-    world = gp.read_file(map_path)
+    world = gp.read_file(Constants.map_path)
 
     return names, gdp, pop, currency, world
 
-def load_locations(
-        n: int,
-        locations_path: str    
-    ) -> np.ndarray:
+def load_locations() -> np.ndarray:
     """
     Loads the locations of the countries
-
-    Parameters:
-        n (int): The number of countries in the dataset
-        locations_path (str): The path to the csv file containing the locations
     
     Returns:
         np.ndarray: The (longitude, latitude) matrix of all locations
     """
-    locations = np.zeros((n,2))
+    locations = np.zeros((Constants.n,2))
 
-    with open(locations_path, 'r') as file:
+    with open(Constants.locations_path, 'r') as file:
         rows = csv.reader(file)
         for i,row in enumerate(rows):
             for j,val in enumerate(row):
@@ -97,19 +71,16 @@ def load_locations(
 
     return locations
 
-def load_groups(groups_path: str) -> list:
+def load_groups() -> list:
     """
     Loads the country groups used for post-processing
-
-    Parameters:
-        groups_path (str): The path to the .txt file containing group information
     
     Returns:
         list: The list of tuples (name, members), where name is a string and members is a list of ISO3 country codes
     """
     groups = []
 
-    with open(groups_path, 'r') as file:
+    with open(Constants.groups_path, 'r') as file:
         rows = file.readlines()
         row_no = 0
         while row_no < len(rows)-1:
@@ -118,33 +89,22 @@ def load_groups(groups_path: str) -> list:
         
     return groups
 
-def load_forecast_data(
-        names_path: str,
-        gdp_path: str,
-        n: int,
-        T_gdp: int,
-    ):
+def load_forecast_data():
     """
     Loads all data required for neural network regression from .csv and .txt files
-
-    Parameters:
-        names_path (str): The path to the file containing each country's ISO3 code
-        gdp_path (str): The path to the file containing each country's GDP data
-        n (int): The number of countries in the dataset
-        T_gdp (int): The amount of years GDP data is available for (ending in 2017)
 
     Returns:
         list[str]: The list of ISO3 codes for each country in the dataset
         np.ndarray: The annual GDP per capita data for each country
     """
     names = []
-    with open(names_path, 'r') as file:
+    with open(Constants.names_path, 'r') as file:
         rows = file.readlines()
         for row in rows:
             names.append(row[:3])
 
-    gdp = np.zeros((n,T_gdp))
-    with open(gdp_path, 'r') as file:
+    gdp = np.zeros((Constants.n,Constants.T_gdp))
+    with open(Constants.gdp_path, 'r') as file:
         rows = csv.reader(file)
         for i, row in enumerate(rows):
             for j, val in enumerate(row):
@@ -173,20 +133,12 @@ def load_labels(path: str) -> np.ndarray:
 
 def load_forecast(
         dir: str,
-        start_year: int,
-        T: int, 
-        train_split: float, 
-        horizon: int
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Loads forecasts from csv files
 
     Parameters:
         dir (str): The directory containing the csv files
-        start_year (int): The start year of observations
-        T (int): The number of observations
-        train_split (float): The train-test ratio
-        horizon (int): The number of future values to be predicted
     
     Returns:
         pd.DataFrame: The in-sample predictions
@@ -202,10 +154,10 @@ def load_forecast(
     test_preds = pd.read_csv(test_path)
     horizon_preds = pd.read_csv(horizon_path)
 
-    split_ind = int(train_split*T)
-    T_in_sample = pd.date_range(start=f'{start_year+split_ind-len(in_sample)}', end=f'{start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{start_year+split_ind}', end=f'{start_year+T}', freq='Y')
-    T_horizon = pd.date_range(start=f'{start_year+T}', end=f'{start_year+T+horizon}', freq='Y')
+    split_ind = int(Constants.train_split*Constants.T)
+    T_in_sample = pd.date_range(start=f'{Constants.start_year+split_ind-len(in_sample)}', end=f'{Constants.start_year+split_ind}', freq='Y')
+    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='Y')
+    T_horizon = pd.date_range(start=f'{Constants.start_year+Constants.T}', end=f'{Constants.start_year+Constants.T+Constants.horizon}', freq='Y')
 
     in_sample.index = T_in_sample
     test_preds.index = T_test
@@ -213,9 +165,7 @@ def load_forecast(
 
     return in_sample, test_preds, horizon_preds
 
-def load_baseline_data(
-        n: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_baseline_data() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Loads baseline econometric models results for comparison
 
@@ -233,8 +183,8 @@ def load_baseline_data(
     """
     paths_F = np.array(loadmat("mcmc/path_F_draws_baseline.mat")['path_F_draws'])
     paths_U = np.array(loadmat("mcmc/paths_U_draws_baseline.mat")['paths_U_draws'])
-    draws = np.zeros((218,n,3000))
-    for i in range(n):
+    draws = np.zeros((218,Constants.n,3000))
+    for i in range(Constants.n):
         draws[:, i, :] = paths_F+paths_U[:, i, :]
     low_frequency = draws[60:118,:,0]
     horizon50 = draws[118:168,:]
