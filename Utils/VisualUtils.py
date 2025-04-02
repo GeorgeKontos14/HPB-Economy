@@ -445,6 +445,7 @@ def plot_forecast_intervals(
         plt.show()
     else:
         plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
+    plt.close()
 
 def plot_forecast_intervals_all_countries(
         data: pd.DataFrame,
@@ -505,6 +506,7 @@ def plot_forecast_intervals_all_countries(
         plt.show()
     else:
         plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
+    plt.close()
 
 def plot_many_predictions(
         data_train: pd.DataFrame,
@@ -588,6 +590,7 @@ def plot_many_predictions(
         plt.show()
     else:
         plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
+    plt.close()
 
 def plot_prediction_and_baseline(
         country: str,
@@ -667,3 +670,4 @@ def plot_prediction_and_baseline(
         plt.show()
     else:
         plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
+    plt.close()
