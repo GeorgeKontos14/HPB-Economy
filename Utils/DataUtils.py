@@ -10,6 +10,8 @@ import csv
 
 import geopandas as gp
 
+import json
+
 import Constants
 
 def load_clustering_data():
@@ -197,6 +199,19 @@ def load_baseline_data() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
     return low_frequency, q05, q16, q84, q95, median, mean 
     
 
+def load_params(path: str) -> dict:
+    """
+    Load parameters from a .txt file
+
+    Parameters:
+        path(str): The path to the file
+
+    Returns:
+        dict: The parameters as a dictionary
+    """
+    with open(path, 'r') as file:
+        return json.load(file)
+
 def write_data(data: np.ndarray, path: str):
     """
     Saves data to the specified file
@@ -250,6 +265,41 @@ def write_forecasts(
     in_sample.to_csv(in_path, index=False)
     test_preds.to_csv(test_path, index=False)
     horizon_preds.to_csv(horizon_path, index=False)
+
+def write_params(
+        parameters: dict, 
+        path: str,
+        nested: int
+    ):
+    """
+    Write the parameters of a model to a file
+
+    Parameters:
+        parameters (dict): The parameters of the model in a dictionary
+        path (str): The path to the file where the parameters should be written
+        nested (int): Flag indicating how many times the dictionary is nested (for serializing)
+    """
+    if nested == 1:
+        serializable = {
+            k: {
+                key: int(value) if isinstance(value, np.integer) else value for key, value in vals.items()
+            } for k, vals in parameters.items()
+        }
+    elif nested == 2:
+        serializable = {}
+        for k1, v1 in parameters.items():
+            if 'd' in v1.keys():
+                serializable[k1] = {key: int(value) if isinstance(value, np.integer) else value for key, value in v1.items()}
+            else:
+                serializable[k1] = {
+                    k2: {key: int(value) if isinstance(value, np.integer) else value for key, value in v2.items()} for k2, v2 in v1.items()
+                }
+    else:
+        serializable = {
+            key: int(value) if isinstance(value, np.integer) else value for key, value in parameters.items()
+        }
+    with open(path, 'w') as file:
+        json.dump(serializable, file, indent=4)
 
 def select_predictions(
         country: str, 

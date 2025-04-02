@@ -30,9 +30,6 @@ def univariate_forecast(
     forecaster, best_params = ForecastingUtils.tree_parzen_univariate(
         data_train=data_train,
         data_test=data_test,
-        lags_bound=4,
-        difference_bound=2,
-        average_bound=3,
         country = country
     )
 
@@ -55,7 +52,6 @@ def univariate_forecast(
     columns = [f'{country}_q_0.05', f'{country}_q_0.16', f'{country}_q_0.84', f'{country}_q_0.95']
     in_sample_preds.columns = columns
     columns.append(f'{country}_q_0.5')
-    columns.append(f'{country}_mean')
     test_preds.columns = columns
     horizon_preds.columns=columns
 

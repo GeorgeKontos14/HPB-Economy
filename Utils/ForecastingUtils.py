@@ -68,8 +68,6 @@ def probability_coverage(
 def calculate_metrics(
         data_test: pd.Series, 
         test_preds: pd.DataFrame, 
-        lower_bound: int, 
-        upper_bound: int,
         country: str
     ) -> pd.DataFrame:
     """
@@ -78,36 +76,38 @@ def calculate_metrics(
     Parameters:
         data_test (pd.Series): The data in the test set
         test_preds (pd.DataFrame): The predictions for the test set
-        lower_bound (int): The lower quantile
-        upper_bound (int): The upper quantile
         country (str): The country for which the predictions are made
     
     Returns:
         pd.Dataframe: A dataframe containing all the calculated metrics
     """
-    lower_quantile = lower_bound/100
-    upper_quantile = upper_bound/100
+    intervals = [(67, 0.16, 0.84), (90, 0.05, 0.95)]
+    metrics = []
+    for length, lower_quantile, upper_quantile in intervals:
+        lower_bound = lower_quantile*100
+        upper_bound = upper_quantile*100
+        lower_bound_vals = test_preds[f'{country}_q_{lower_quantile}'].values
+        upper_bound_vals = test_preds[f'{country}_q_{upper_quantile}'].values
 
-    lower_bound_vals = test_preds['lower_bound'].values
-    upper_bound_vals = test_preds['upper_bound'].values
+        y = data_test.values
 
-    y = data_test.values
+        coverage = probability_coverage(y, lower_bound_vals, upper_bound_vals)
 
-    coverage = probability_coverage(y, lower_bound_vals, upper_bound_vals)
+        lower_q_loss = pinball_loss(y, lower_bound_vals, lower_quantile)
+        upper_q_loss = pinball_loss(y, upper_bound_vals, upper_quantile)
+        median_loss = pinball_loss(y, test_preds[f'{country}_q_0.5'].values, 0.5)
 
-    lower_q_loss = pinball_loss(y, lower_bound_vals, lower_quantile)
-    upper_q_loss = pinball_loss(y, upper_bound_vals, upper_quantile)
-    median_loss = pinball_loss(y, test_preds['median'].values, 0.5)
-
-    idx = [
-        f'Probability Coverage {upper_bound-lower_bound}%', 
-        f'Pinball Loss for {lower_bound}th Quantile',
-        f'Pinball Loss for Median',
-        f'Pinball Loss for {upper_bound}th Quantile'
-    ]
-    metrics = pd.DataFrame(data = np.array([
+        idx = [
+            f'Probability Coverage {upper_bound-lower_bound}%', 
+            f'Pinball Loss for {lower_bound}th Quantile',
+            f'Pinball Loss for Median',
+            f'Pinball Loss for {upper_bound}th Quantile'
+        ]
+        metrics.append(pd.DataFrame(data = np.array([
         coverage, lower_q_loss, median_loss, upper_q_loss
-    ]), columns=[country], index=idx)
+    ]), columns=[country], index=idx))
+    
+    metrics = pd.concat(metrics, axis=0)
 
     return metrics
 
@@ -173,6 +173,55 @@ def evaluate(
     
     return metrics, intervals
 
+def evaluate_forecast(
+        data: pd.DataFrame,
+        preds: pd.DataFrame,
+        countries: list[str]
+    ) -> pd.DataFrame:
+    """
+    Evaluate a single forecast
+
+    Parameters:
+        data (pd.DataFrame): The observed values
+        preds (pd.DataFrame): The predictions for the observed values
+        countries (list[str]): The countries for which to evaluate
+
+    Returns:
+        pd.DataFrame: The metrics for the model
+    """
+    metrics = []
+    for country in countries:
+        y = data[country]
+        metrics.append(calculate_metrics(y, preds, country))
+    metrics = pd.concat(metrics, axis=1)
+    return metrics
+
+def evaluate_multiple_forecasts(
+        data: pd.DataFrame,
+        predictions: list[pd.DataFrame],
+        models: list[str],
+        countries: list[str]
+    ) -> pd.DataFrame:
+    """
+    Evaluate multiple forecasts
+
+    Parameters:
+        data (pd.DataFrame): The observed values
+        predictions (list[pd.DataFrame]): The predictions of each forecast for the observed values
+        models (list[str]): The underlying models of each forecaster
+        countries (list[str]): The countries for which to evaluate
+
+    Returns:
+        pd.DataFrame: The (average) metrics for the model
+    """
+    metrics = []
+    for preds in predictions:
+        model_metrics = evaluate_forecast(data, preds, countries)
+        metrics.append(model_metrics.mean(axis=1))
+    metrics = pd.concat(metrics, axis=1)
+    metrics.columns = models
+    return metrics
+
 def interval_overlap_ratio(
         preds: pd.DataFrame, 
         baseline_low: np.ndarray, 
@@ -235,12 +284,12 @@ def relative_interval_width_ratio(
     else:
         L = preds[f'{country}_q_0.05'].to_numpy()
         U = preds[f'{country}_q_0.95'].to_numpy()  
-    for i in range(Constants.T_horizon):
+    for i in range(Constants.horizon):
         num = U[i]-L[i]
         denom = baseline_up[i]-baseline_low[i]
         ratio += num/denom
 
-    return ratio/Constants.T_horizon
+    return ratio/Constants.horizon
 
 def compare_to_baseline(
         countries: list[str],
@@ -339,7 +388,7 @@ def create_univariate_forecaster(
     window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
 
     return ForecasterRecursive(
-        regressor=GradientBoostingRegressor(loss='quantile'),
+        regressor=GradientBoostingRegressor(loss='absolute_error'),
         lags=p,
         window_features=window_features,
         differentiation=differentiation
@@ -369,14 +418,14 @@ def create_multivariate_forecaster(
     window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
     if model_type == 'ForecasterRecursiveMultiSeries':
         forecaster = ForecasterRecursiveMultiSeries(
-            regressor=GradientBoostingRegressor(loss='quantile'),
+            regressor=GradientBoostingRegressor(loss='absolute_error'),
             lags = p,
             window_features=window_features,
             differentiation=differentiation
         )
     elif model_type == 'ForecasterDirectMultiVariate':
         forecaster = ForecasterDirectMultiVariate(
-            regressor = GradientBoostingRegressor(loss='quantile'),
+            regressor = GradientBoostingRegressor(loss='absolute_error'),
             level=level[0],
             steps=steps,
             lags = p,
@@ -386,7 +435,7 @@ def create_multivariate_forecaster(
     elif model_type == 'ForecastDirectMultiOutput':
         forecaster = ForecastDirectMultiOutput(
             regressor= MultiOutputRegressor(
-                GradientBoostingRegressor(loss='quantile')
+                GradientBoostingRegressor(loss='absolute_error')
             ),
             levels=level,
             lags=p,
@@ -594,7 +643,7 @@ def tree_parzen_univariate(
         fn = objective,
         space = search_space,
         algo = tpe.suggest,
-        max_evals = int(0.2*N),
+        max_evals = int(0.3*N),
         trials=trials,
         early_stop_fn=no_progress_loss(stop)
     )
@@ -688,7 +737,7 @@ def tree_parzen_multivariate(
         fn = objective,
         space = search_space,
         algo = tpe.suggest,
-        max_evals = int(0.2*N),
+        max_evals = int(0.3*N),
         trials=trials,
         early_stop_fn=no_progress_loss(stop)
     )

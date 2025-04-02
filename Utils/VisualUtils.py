@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 
 import pandas as pd
@@ -291,6 +293,47 @@ def plot_arima_orders(arima_orders: np.ndarray):
     plt.legend()
     plt.show()
 
+def limits_by_country(
+        in_sample: pd.DataFrame,
+        test_preds: pd.DataFrame,
+        horizon_preds: pd.DataFrame,
+        country: str
+    ) -> Tuple[float, float]:
+    """
+    Find the limits of the plot (for the y-axis)
+
+    Parameters:
+        in_sample (pd.DataFrame): The in-sample predictions for the time series
+        test_preds (pd.DataFrame): The predictions for the test set
+        horizon_preds (pd.DataFrame): The future predictions
+        country (str): The name of the country
+
+    Returns:
+        float: The lower limit for the y-axis
+        float: The upper limit for the y-axis    
+    """
+    if in_sample is not None:
+        in_sample_country = in_sample[[col for col in in_sample.columns if country in col]]
+    else:
+        in_sample_country = None
+    if test_preds is not None:
+        test_preds_country = test_preds[[col for col in test_preds.columns if country in col]]
+    else:
+        test_preds_country = None
+    if horizon_preds is not None:
+        horizon_preds_country = horizon_preds[[col for col in horizon_preds.columns if country in col]]
+    else:
+        horizon_preds_country = None
+
+    all_values = np.concatenate([
+        in_sample_country.values.flatten() if in_sample_country is not None else [],
+        test_preds_country.values.flatten() if test_preds_country is not None else [],
+        horizon_preds_country.values.flatten() if horizon_preds_country is not None else []
+    ])
+
+    y_min, y_max = np.min(all_values), np.max(all_values)
+    return y_min-0.4, y_max+0.4
+
 def plot_forecast_intervals(
         data_train: pd.Series,
         data_test: pd.Series,
@@ -302,7 +345,8 @@ def plot_forecast_intervals(
         title: str = None,
         show_legend: bool = True,
         show67: bool = True,
-        show90: bool = True
+        show90: bool = True,
+        path: str = None
     ):
     """
     Plots the probabilistic forecast for a given country
@@ -318,18 +362,24 @@ def plot_forecast_intervals(
         title (str): The title of the plot; if none, the name of the country
         show_legend (bool): Whether or not to display a legend alongside the plot. 
         show67 (bool): Flag indicating whether or not to plot the 67% prediction intervals
-        show90 (bool): Flag indicating whether or not to plot the 90% prediction intervals           
+        show90 (bool): Flag indicating whether or not to plot the 90% prediction intervals
+        path (str): The path to save the plot; if none, the plot is displayed instead            
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(8, 5))
 
     if title is None:
         ax.set_title(country)
     else:
         ax.set_title(title)
 
-    data_train.plot(ax=ax, label='Train', color='black')
-    data_test.plot(ax=ax, label="Test", color='green')
+    y_min, y_max = limits_by_country(
+        in_sample, test_preds, horizon_preds, country
+    )
+    ax.set_ylim([y_min, y_max])
+
+    data_train.plot(ax=ax, label='Training Set', color='black')
+    data_test.plot(ax=ax, label="Test Set", color='darkgreen')
 
     if in_sample is not None:
         if show67:
@@ -337,18 +387,16 @@ def plot_forecast_intervals(
                 in_sample.index,
                 in_sample[f'{country}_q_0.16'],
                 in_sample[f'{country}_q_0.84'],
-                color = 'lightskyblue',
-                alpha=0.8,
-                label = f'67% interval (in-sample)'
+                color = 'steelblue',
+                alpha=0.8
             )
         if show90:
             ax.fill_between(
                 in_sample.index,
                 in_sample[f'{country}_q_0.05'],
                 in_sample[f'{country}_q_0.95'],
-                color = 'lightskyblue',
-                alpha=0.3,
-                label = f'90% interval (in-sample)'
+                color = 'steelblue',
+                alpha=0.3
             )
 
     if test_preds is not None:
@@ -358,8 +406,7 @@ def plot_forecast_intervals(
                 test_preds[f'{country}_q_0.16'],
                 test_preds[f'{country}_q_0.84'],
                 color = 'orange',
-                alpha=0.8,
-                label = f'67% interval (test)'
+                alpha=0.8
             )
         if show90:
             ax.fill_between(
@@ -367,32 +414,97 @@ def plot_forecast_intervals(
                 test_preds[f'{country}_q_0.05'],
                 test_preds[f'{country}_q_0.95'],
                 color = 'orange',
-                alpha=0.3,
-                label = f'90% interval (test)'
+                alpha=0.3
             )
     if horizon_preds is not None:
-        horizon_preds[f'{country}_q_0.5'].plot(ax=ax, color='red', label = 'Median (horizon)')
+        horizon_preds[f'{country}_q_0.5'].plot(ax=ax, color='darkred', label = 'Median Prediction')
         if show67:
             ax.fill_between(
                 horizon_preds.index,
                 horizon_preds[f'{country}_q_0.16'],
                 horizon_preds[f'{country}_q_0.84'],
-                color = 'coral',
-                alpha=0.8,
-                label = f'67% interval (horizon)'
+                color = 'tomato',
+                alpha=0.8
             )
         if show90:
             ax.fill_between(
                 horizon_preds.index,
                 horizon_preds[f'{country}_q_0.05'],
                 horizon_preds[f'{country}_q_0.95'],
-                color = 'coral',
-                alpha=0.3,
-                label = f'90% interval (horizon)'
+                color = 'tomato',
+                alpha=0.3
             )
 
     if show_legend:
-        ax.legend()  
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=3, fontsize=10)
+
+    ax.set_xlabel("Time")
+    ax.set_ylabel("log(GDP)")
+    fig.tight_layout(rect=[0,0.05,1,0.92], pad=2.0)
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
+
+def plot_forecast_intervals_all_countries(
+        data: pd.DataFrame,
+        countries: list[str],
+        target_country: str,
+        preds: pd.DataFrame,
+        model_name: str,
+        path: str = None
+    ):
+    """
+    Plots the probabilistic forecasts for a given country, together for the observed data for all countries
+
+    Parameters:
+        data (pd.DataFrame): The observed data
+        countries (list[str]): The countries to plot
+        target_country (str): The country for which to plot predictions
+        preds (pd.DataFrame): The predictions to be plotted
+        model_name (str): The name of the model that produced the results
+        path (str): The path to save the plot; if none, the plot is displayed instead   
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.set_title(f"{target_country} ({model_name})")
+
+    all_vals = data.values.flatten()
+    y_min, y_max = np.min(all_vals), np.max(all_vals)
+    all_preds = preds[[col for col in preds.columns if target_country in col]].values.flatten()
+    y_min = min(y_min, np.min(all_preds)) - 0.4
+    y_max = max(y_max, np.max(all_preds)) + 0.4
+    ax.set_ylim([y_min, y_max])
+
+    for country in countries:
+        if country != target_country:
+            data[country].plot(ax=ax, linewidth=1, alpha=0.5)
+
+    data[target_country].plot(ax=ax, linewidth=2, color='black')
+
+    preds[f'{target_country}_q_0.5'].plot(ax=ax, color='darkred')
+    ax.fill_between(
+        preds.index,
+        preds[f'{target_country}_q_0.16'],
+        preds[f'{target_country}_q_0.84'],
+        color = 'tomato',
+        alpha=0.8
+    )
+    ax.fill_between(
+        preds.index,
+        preds[f'{target_country}_q_0.05'],
+        preds[f'{target_country}_q_0.95'],
+        color = 'tomato',
+        alpha=0.3
+    )
+
+    ax.set_xlabel("Time")
+    ax.set_ylabel("log(GDP)")
+    fig.tight_layout(rect=[0,0.05,1,0.92], pad=2.0)
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
 
 def plot_many_predictions(
         data_train: pd.DataFrame,
@@ -406,7 +518,8 @@ def plot_many_predictions(
         horizon_preds: list[pd.DataFrame] = None,
         show67: bool = True,
         show90: bool = True,
-        title: str = None
+        title: str = None,
+        path: str = None
     ):
     """
     Plot multiple predictions for the same country
@@ -423,7 +536,8 @@ def plot_many_predictions(
         horizon_preds (list[pd.DataFrame]): The future predictions
         show67 (bool): Flag indicating whether or not to plot the 67% prediction intervals
         show90 (bool): Flag indicating whether or not to plot the 90% prediction intervals  
-        title (str): The title of the plot; if none, the name of the country        
+        title (str): The title of the plot; if none, the name of the country
+        path (str): The path to save the plot; if none, the plot is displayed instead      
     """
     fig, axs = plt.subplots(rows, columns, figsize=(12,8))
 
@@ -469,20 +583,25 @@ def plot_many_predictions(
     else:
         fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0,0.05,1,0.92])
-    plt.show()
+
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(path, bbox_inches='tight', pad_inches=0.25)
 
 def plot_prediction_and_baseline(
         country: str,
         model_type: str,
         ind: int,
         gdp: np.ndarray,
-        low_freq: np.ndarray,
         horizon_preds: pd.DataFrame,
         q05: np.ndarray,
         q16: np.ndarray,
         q84: np.ndarray,
         q95: np.ndarray,
-        title: str = None
+        low_freq: np.ndarray = None,
+        title: str = None,
+        path: str = None,
     ):
     """
     Plot the prediction intervals of a specific model and the baseline on the same plot
@@ -492,13 +611,14 @@ def plot_prediction_and_baseline(
         model_type (str): The type of model that was used for the predictions
         ind (int): The index corresponding to the country
         gdp (np.ndarray): The observed GDP data for all countries
-        low_freq (np.ndarray): The low-frequency trend of the observed data
         horizon_preds (pd.Dataframe): The future predictions
         q05 (np.ndarray): The 5th baseline quantile
         q16 (np.ndarray): The 16th baseline quantile
         q84 (np.ndarray): The 84th baseline quantile
         q95 (np.ndarray): The 95th baseline quantile
+        low_freq (np.ndarray): The low-frequency trend of the observed data
         title (str): The title of the plot; if none, the name of the country  
+        path (str): The path to save the plot; if none, the plot is displayed instead
     """
     T_horizon = len(q05[:,0])
     in_sample_time = np.arange(Constants.start_year, Constants.start_year+Constants.T)
@@ -509,23 +629,25 @@ def plot_prediction_and_baseline(
 
     ax = ax_list[0]
     ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
-    ax.plot(in_sample_time, low_freq[:,ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
+    if low_freq is not None:
+        ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
     ax.fill_between(
         horizon_time, q16[:, ind], q84[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
     )
     ax.fill_between(
-        horizon_time, horizon_preds[f'{country}_q_0.16'], horizon_preds[f'{country}_q_0.84'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+        horizon_time, horizon_preds[f'{country}_q_0.16'], horizon_preds[f'{country}_q_0.84'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
     ax.set_title(f'67% Prediction Intervals')
 
     ax = ax_list[1]
     ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
-    ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
+    if low_freq is not None:
+        ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
     ax.fill_between(
         horizon_time, q05[:, ind], q95[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
     )
     ax.fill_between(
-        horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='coral', alpha=0.5, label=f'{model_type} Prediction Interval'
+        horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
     ax.set_title(f'90% Prediction Intervals')
 
@@ -540,4 +662,8 @@ def plot_prediction_and_baseline(
     else:
         fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0,0.05,1,0.92])
-    plt.show()
+    
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(path, bbox_inches='tight', pad_inches=0.25)

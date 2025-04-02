@@ -189,9 +189,7 @@ def preprocess_univariate_forecast(
     split_ind = int(Constants.train_split*T)
     test_steps = T-split_ind
 
-    T_train, T_test, T_all = make_indexes(
-        start_year=Constants.start_year, split_ind=split_ind, T=T
-    )
+    T_train, T_test, T_all = make_indexes(split_ind=split_ind)
 
     data_train = pd.Series(y[:split_ind], index=T_train)
     data_test = pd.Series(y[split_ind:], index=T_test)
@@ -220,9 +218,7 @@ def preprocess_multivariate_forecast(
     split_ind = int(T*Constants.train_split)
     test_steps = T-split_ind
 
-    T_train, T_test, T_all = make_indexes(
-        start_year=Constants.start_year, split_ind=split_ind, T=T
-    )
+    T_train, T_test, T_all = make_indexes(split_ind=split_ind)
 
     data_train = pd.DataFrame(y[:, :split_ind].T, index=T_train, columns=countries)
     data_test = pd.DataFrame(y[:, split_ind:].T, index=T_test, columns=countries)

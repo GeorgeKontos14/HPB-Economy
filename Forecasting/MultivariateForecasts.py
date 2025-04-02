@@ -96,7 +96,7 @@ def many_to_one_forecasts(
             countries_to_predict=[country],
             model_type='ForecasterDirectMultiVariate',
         )
-        best_params[params_countries] = params_countries
+        best_params[country] = params_countries
         test_forecaster.fit(series=data_train)
         country_test_preds = test_forecaster.predict_quantiles(
             steps=test_steps,
