@@ -312,14 +312,14 @@ def limits_by_country(
         float: The lower limit for the y-axis
         float: The upper limit for the y-axis    
     """
-    if in_sample is not None:
+    if isinstance(in_sample, pd.DataFrame):
         in_sample_country = in_sample[[col for col in in_sample.columns if country in col]]
     else:
-        in_sample_country = None
-    if test_preds is not None:
+        in_sample_country = in_sample
+    if isinstance(test_preds, pd.DataFrame):
         test_preds_country = test_preds[[col for col in test_preds.columns if country in col]]
     else:
-        test_preds_country = None
+        test_preds_country = test_preds
     if horizon_preds is not None:
         horizon_preds_country = horizon_preds[[col for col in horizon_preds.columns if country in col]]
     else:
@@ -374,7 +374,7 @@ def plot_forecast_intervals(
         ax.set_title(title)
 
     y_min, y_max = limits_by_country(
-        in_sample, test_preds, horizon_preds, country
+        in_sample if in_sample is not None else data_train, test_preds if test_preds is not None else data_test, horizon_preds, country
     )
     ax.set_ylim([y_min, y_max])
 
