@@ -197,6 +197,15 @@ def load_baseline_data() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
     median = np.quantile(horizon50, 0.5, axis=2)
     mean = np.mean(horizon50, axis=2)
     return low_frequency, q05, q16, q84, q95, median, mean 
+
+def load_ahead_values() -> pd.DataFrame:
+    """
+    Loads the GDP values for the period 2018-2022
+    """
+    index_ahead = pd.date_range(start=f'{Constants.start_year+Constants.T}', end=f'{Constants.start_year+Constants.T+Constants.T_ahead}', freq='Y')
+    ahead = pd.read_csv(Constants.ahead_path)
+    ahead.index = index_ahead
+    return ahead
     
 
 def load_params(path: str) -> dict:

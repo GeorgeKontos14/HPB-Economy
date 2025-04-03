@@ -1,0 +1,7 @@
+Model,67% Interval,90% Interval
+Baseline,0.74867257,0.91150442
+Independent GBR (All),0.6,0.78938053
+Independent GBR (Clusters),0.53451327,0.75044248
+Univariate GBR,0.2920354,0.54159292
+Many to One GBR (Clusters),0.1539823,0.18230088
+Many to Many GBR (Clusters),0.07079646,0.09911504
