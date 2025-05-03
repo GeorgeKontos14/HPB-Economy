@@ -23,7 +23,8 @@ from hyperopt.early_stop import no_progress_loss
 import Constants
 from Forecasting.ForecasterMultioutput import ForecastDirectMultiOutput
 from Forecasting.ForecasterRNNProb import ForecastRNNProb
-from Utils import DataUtils
+from Forecasting.ForecasterQuantile import ForecasterMultiSeriesQuantile
+from Utils import DataUtils, PostProcessing
 
 def pinball_loss(
         y: np.ndarray, 
@@ -362,11 +363,26 @@ def predict_in_sample(data_train: pd.DataFrame, forecaster: ForecasterBase) -> p
     """
     if isinstance(forecaster, ForecasterRecursiveMultiSeries):
         size = len(list(forecaster.last_window_.values())[0])
+    elif isinstance(forecaster, ForecasterMultiSeriesQuantile):
+        size = list(forecaster.last_window_.values())[0].shape[0]
     else:
         size = forecaster.last_window_.shape[0]
     remaining_steps = len(data_train)-size
     first_window = data_train[:size]
-    all_preds = forecaster.predict_quantiles(steps = remaining_steps, last_window=first_window, quantiles = [0.05, 0.16, 0.84, 0.95])
+    if isinstance(forecaster, ForecasterMultiSeriesQuantile):
+        all_preds = forecaster.predict(steps = remaining_steps, last_window=first_window)
+    else:
+        all_preds = forecaster.predict_quantiles(steps = remaining_steps, last_window=first_window, quantiles = [0.05, 0.16, 0.84, 0.95])
+    if isinstance(forecaster, ForecasterMultiSeriesQuantile):
+        quantiles=[0.05,0.16,0.84,0.95]
+        pred_list = []
+        for q in quantiles:
+            df = PostProcessing.pivot_dataframe(all_preds[q], 'level','pred')
+            df.columns = [f'{column}_q_{q}' for column in df.columns]
+            pred_list.append(df)
+        all_preds = pd.concat(pred_list,axis=1)
+    elif not isinstance(forecaster, ForecastDirectMultiOutput):
+        all_preds = PostProcessing.pivot_dataframe(all_preds, pivot_column='level', target_column='pred')
     if isinstance(forecaster, ForecasterDirectMultiVariate):
         return all_preds
     return all_preds[:remaining_steps]
@@ -409,7 +425,7 @@ def create_multivariate_forecaster(
         p (list[int]): The number of lags for each variable
         d (int): The order of differentiation
         q (int): The rolling window size
-        model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput'
+        model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput', 'ForecasterMultiSeriesQuantile
         steps (int): The number of steps to be predicted
         level (list[str]): The variables to be predicted
     """
@@ -442,6 +458,14 @@ def create_multivariate_forecaster(
             window_features=window_features,
             differentiation=differentiation,
             steps = steps
+        )
+    elif model_type == 'ForecasterMultiSeriesQuantile':
+        forecaster = ForecasterMultiSeriesQuantile(
+            quantiles=[0.05,0.16,0.5,0.84,0.95],
+            levels = level,
+            lags = p,
+            window_features=window_features,
+            differentiation=differentiation
         )
     return forecaster
 
@@ -713,6 +737,9 @@ def tree_parzen_multivariate(
             n_boot=100
         )
         preds = model.predict(steps=test_steps)
+        if not isinstance(model, ForecastDirectMultiOutput):
+            q_preds = PostProcessing.pivot_dataframe(q_preds, 'level', 'pred')
+            preds = PostProcessing.pivot_dataframe(preds, 'level', 'pred')
         mse = 0        
         for country in countries_to_predict:
             y = data_test[country]
@@ -731,6 +758,113 @@ def tree_parzen_multivariate(
         loss_median = loss_median/m
         mse = mse/m
         return {'loss': loss_median+(int_score_67+int_score_90)/2+0.2*mse, 'status': 'ok'}
+
+    trials = Trials()
+    best_params = fmin(
+        fn = objective,
+        space = search_space,
+        algo = tpe.suggest,
+        max_evals = int(0.3*N),
+        trials=trials,
+        early_stop_fn=no_progress_loss(stop)
+    )
+
+    lags = [int(best_params[f"p_{i}"])+1 for i in range(n)]
+    difference = int(best_params['d'])
+    ma = int(best_params['q'])
+
+    forecaster_test = create_multivariate_forecaster(
+        p = lags,
+        d = difference,
+        q = ma,
+        model_type=model_type,
+        steps = test_steps,
+        level = countries_to_predict
+    )
+
+    forecaster_horizon = create_multivariate_forecaster(
+        p = lags,
+        d = difference,
+        q = ma,
+        model_type = model_type,
+        steps = Constants.horizon,
+        level = countries_to_predict
+    )
+
+    return forecaster_test, forecaster_horizon, best_params
+
+def tree_parzen_quantile(
+        data_train: pd.DataFrame,
+        data_test: pd.DataFrame,
+        countries_to_predict: list[str],
+        model_type: str = "ForecasterMultiSeriesQuantile",
+    )-> Tuple[ForecasterBase, ForecasterBase]:
+    """
+    Performs hyperparameter tuning for multivariate quantile forecasts using tree-structured Parzen estimation
+
+    Parameters:
+        data_train (pd.DataFrame): The training set
+        data_test (pd.DataFrame): The test set
+        countries_to_predict (list[str]): The countries for which predictions are made
+        model_type (str): The type of model to create. One of 'ForecasterMultiSeriesQuantile'
+        horizon (int): The number of future values to ultimately predict
+
+    Returns:
+        ForecasterBase: The forecaster for the test set
+        ForecasterBase: The forecaster for the horizon
+        dict: The best parameters 
+    """
+    test_steps = len(data_test)
+    n = data_train.shape[1]
+    m = len(countries_to_predict)
+
+    search_space = {
+        'd': hp.quniform('d', 0, Constants.difference_bound, 1),
+        'q': hp.quniform('q', 0, Constants.average_bound, 1),
+    }
+    N = Constants.difference_bound*Constants.average_bound
+    search_space['p'] = [hp.choice(f"p_{i}", list(range(1,Constants.lags_bound))) for i in range(n)]
+    N = N*(Constants.lags_bound-1)**n
+
+    if N <= 250:
+        stop = 6
+    elif N < 750:
+        stop = 10
+    else:
+        stop = 15  
+
+    def objective(params):
+        p, d, q = params['p'], int(params['d']), int(params['q'])
+        model = create_multivariate_forecaster(
+            p, d, q, model_type, test_steps, countries_to_predict
+        )
+        model.fit(series=data_train)
+        int_score_67 = 0
+        int_score_90 = 0
+        loss_median = 0
+        q_preds = model.predict(steps=test_steps)
+        quantiles = [0.05,0.16,0.5,0.84,0.95]
+        predictions = []
+        for q in quantiles:
+            df = PostProcessing.pivot_dataframe(q_preds[q], 'level', 'pred')
+            df.columns = [f'{column}_q_{q}' for column in df.columns]
+            predictions.append(df)
+        q_preds = pd.concat(predictions, axis=1)
+        for country in countries_to_predict:
+            y = data_test[country]
+            p_lengths_67 = interval_width(q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'], country)
+            p_lengths_90 = interval_width(q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'], country)
+            lengths_67 = p_lengths_67.iloc[-1,0]
+            lengths_90 = p_lengths_90.iloc[-1,0]
+            cov_67 = probability_coverage(y, q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'])
+            cov_90 = probability_coverage(y, q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'])
+            int_score_67 += np.sqrt(lengths_67)*np.abs(cov_67-0.67)
+            int_score_90 += np.sqrt(lengths_90)*np.abs(cov_90-0.9)
+            loss_median += pinball_loss(y, q_preds[f'{country}_q_0.5'], 0.5)
+        int_score_67 = int_score_67/m
+        int_score_90 = int_score_90/m
+        loss_median = loss_median/m
+        return {'loss': loss_median+(int_score_67+int_score_90)/2, 'status': 'ok'}
 
     trials = Trials()
     best_params = fmin(

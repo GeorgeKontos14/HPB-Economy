@@ -1,5 +1,7 @@
 import numpy as np
 
+import pandas as pd
+
 from scipy.spatial.distance import pdist, squareform
 
 from sklearn.metrics.pairwise import haversine_distances
@@ -149,3 +151,22 @@ def postprocess_clustering(
         VisualUtils.plot_group_graph(members, edges, colors, thickness, title)
 
 
+def pivot_dataframe(df: pd.DataFrame, pivot_column: str, target_column: str) -> pd.DataFrame:
+    """
+    Transforms a prediction dataframe
+
+    Parameters:
+        df (pd.DataFrame): The dataframe to transform
+        pivot_column (str): The pivot to become the columns
+        target_column (str): The column to be split into the new dataframe
+    
+    Returns:
+        pd.DataFrame: The original dataframe in the appropriate format
+    """
+    series = []
+    pivot_values = df[pivot_column].unique().tolist()
+    for column in pivot_values:
+        series.append(df[df[pivot_column] == column][target_column])
+    concat = pd.concat(series, axis=1)
+    concat.columns = pivot_values
+    return concat

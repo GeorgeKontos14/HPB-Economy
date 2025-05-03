@@ -2,10 +2,8 @@ import numpy as np
 
 import pandas as pd
 
-from skforecast.preprocessing import TimeSeriesDifferentiator
-
 import Constants
-from Utils import ForecastingUtils, PreProcessing
+from Utils import ForecastingUtils, PreProcessing, PostProcessing
 
 def multiseries_independent_forecasts(
         y: np.ndarray,
@@ -39,14 +37,12 @@ def multiseries_independent_forecasts(
     )
 
     forecaster.fit(series=data_train)
-    test_preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05,0.16,0.84,0.95], n_boot=100)
-    test_med = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-    test_preds = pd.concat([test_preds, test_med], axis=1)
+    test_preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05,0.16,0.5,0.84,0.95], n_boot=100)
+    test_preds = PostProcessing.pivot_dataframe(test_preds, 'level', 'pred')
 
     forecaster.fit(series=data_all)
-    horizon_preds = forecaster.predict_quantiles(steps=Constants.horizon, quantiles=[0.05,0.16,0.84,0.95], n_boot=100)
-    horizon_med = forecaster.predict_quantiles(steps=Constants.horizon, quantiles=[0.5])
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
+    horizon_preds = forecaster.predict_quantiles(steps=Constants.horizon, quantiles=[0.05,0.16,0.5,0.84,0.95], n_boot=100)
+    horizon_preds = PostProcessing.pivot_dataframe(horizon_preds, 'level', 'pred')
     
     in_sample_preds = ForecastingUtils.predict_in_sample(data_train, forecaster)
 
@@ -100,20 +96,18 @@ def many_to_one_forecasts(
         test_forecaster.fit(series=data_train)
         country_test_preds = test_forecaster.predict_quantiles(
             steps=test_steps,
-            quantiles=[0.05,0.16,0.84,0.95],
+            quantiles=[0.05,0.16,0,5,0.84,0.95],
             n_boot = 100
         )
-        country_test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-        country_test_preds = pd.concat([country_test_preds, country_test_med], axis=1)
+        country_test_preds = PostProcessing.pivot_dataframe(country_test_preds, 'level', 'pred')
 
         horizon_forecaster.fit(series=data_all)
         country_horizon_preds = horizon_forecaster.predict_quantiles(
             steps=Constants.horizon,
-            quantiles=[0.05,0.16,0.84,0.95],
+            quantiles=[0.05,0.16,0.5,0.84,0.95],
             n_boot = 100
         )
-        country_horizon_med = horizon_forecaster.predict_quantiles(steps=Constants.horizon, quantiles=[0.5])
-        country_horizon_preds = pd.concat([country_horizon_preds, country_horizon_med], axis=1)
+        country_horizon_preds = PostProcessing.pivot_dataframe(country_horizon_preds, 'level', 'pred')
         country_in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
         in_sample.append(country_in_sample_preds)
         test_preds = pd.concat([test_preds, country_test_preds], axis=1)
@@ -184,6 +178,59 @@ def many_to_many_forecasts(
     in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
 
     return data_train, data_test, test_preds, horizon_preds, in_sample_preds, best_params
+
+def multiseries_quantiles(
+        y: np.ndarray,
+        countries: list[str],
+    ):
+    """
+    Performs quantile forecasting on multiple time series without considering the relations between different time series
+
+    Parameters:
+        y (np.ndarray): The input time series matrix of dimensions (m,T)
+        countries (list[str]): The list containing the ISO3 codes for each country in the dataset
+
+    Returns:
+        pd.DataFrame: The indexed training set
+        pd.DataFrame: The indexed test set
+        pd.DataFrame: The prediction intervals for the test set
+        pd.DataFrame: The prediction intervals for the horizon
+        pd.DataFrame: The in-sample prediction intervals
+        dict: The best parameters
+    """  
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
+        countries=countries, y=y
+    )
+
+    forecaster, _, best_params = ForecastingUtils.tree_parzen_quantile(
+        data_train=data_train,
+        data_test=data_test,
+        countries_to_predict=countries, 
+        model_type='ForecasterMultiSeriesQuantile',
+    )
+    forecaster.fit(series=data_train)
+    test_preds = forecaster.predict(steps=test_steps)
+    quantiles = [0.05,0.16,0.5,0.84,0.95]
+    test_pred_list = []
+    for q in quantiles:
+        df = PostProcessing.pivot_dataframe(test_preds[q], 'level', 'pred')
+        df.columns = [f'{column}_q_{q}' for column in df.columns]
+        test_pred_list.append(df)
+    test_preds = pd.concat(test_pred_list, axis=1)
+
+    forecaster.fit(series=data_all)
+    horizon_preds = forecaster.predict(steps=Constants.horizon)
+    horizon_preds_list = []
+    for q in quantiles:
+        df = PostProcessing.pivot_dataframe(horizon_preds[q], 'level', 'pred')
+        df.columns = [f'{column}_q_{q}' for column in df.columns]
+        horizon_preds_list.append(df)
+    horizon_preds = pd.concat(horizon_preds_list, axis=1)
+    
+    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, forecaster)
+
+    return data_train, data_test, test_preds, horizon_preds, in_sample_preds, best_params
+
 
 def rnn_forecasts(
         y: np.ndarray,
