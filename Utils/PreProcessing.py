@@ -163,9 +163,9 @@ def make_indexes(
         pd.DatetimeIndex: The index of the test set
         pd.DatetimeIndex: The index of the entire dataset
     """
-    T_train = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='Y')
-    T_all = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+Constants.T}', freq='Y')
+    T_train = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+split_ind}', freq='YE')
+    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='YE')
+    T_all = pd.date_range(start=f'{Constants.start_year}', end=f'{Constants.start_year+Constants.T}', freq='YE')
 
     return T_train, T_test, T_all
 

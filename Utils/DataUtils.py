@@ -157,9 +157,9 @@ def load_forecast(
     horizon_preds = pd.read_csv(horizon_path)
 
     split_ind = int(Constants.train_split*Constants.T)
-    T_in_sample = pd.date_range(start=f'{Constants.start_year+split_ind-len(in_sample)}', end=f'{Constants.start_year+split_ind}', freq='Y')
-    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='Y')
-    T_horizon = pd.date_range(start=f'{Constants.start_year+Constants.T}', end=f'{Constants.start_year+Constants.T+Constants.horizon}', freq='Y')
+    T_in_sample = pd.date_range(start=f'{Constants.start_year+split_ind-len(in_sample)}', end=f'{Constants.start_year+split_ind}', freq='YE')
+    T_test = pd.date_range(start=f'{Constants.start_year+split_ind}', end=f'{Constants.start_year+Constants.T}', freq='YE')
+    T_horizon = pd.date_range(start=f'{Constants.start_year+Constants.T}', end=f'{Constants.start_year+Constants.T+Constants.horizon}', freq='YE')
 
     in_sample.index = T_in_sample
     test_preds.index = T_test

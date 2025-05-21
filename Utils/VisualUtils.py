@@ -600,6 +600,7 @@ def plot_prediction_and_baseline(
         horizon_preds: pd.DataFrame,
         q05: np.ndarray,
         q16: np.ndarray,
+        q50: np.ndarray,
         q84: np.ndarray,
         q95: np.ndarray,
         low_freq: np.ndarray = None,
@@ -617,6 +618,7 @@ def plot_prediction_and_baseline(
         horizon_preds (pd.Dataframe): The future predictions
         q05 (np.ndarray): The 5th baseline quantile
         q16 (np.ndarray): The 16th baseline quantile
+        q50 (np.ndarray): The median baseline
         q84 (np.ndarray): The 84th baseline quantile
         q95 (np.ndarray): The 95th baseline quantile
         low_freq (np.ndarray): The low-frequency trend of the observed data
@@ -640,6 +642,8 @@ def plot_prediction_and_baseline(
     ax.fill_between(
         horizon_time, horizon_preds[f'{country}_q_0.16'], horizon_preds[f'{country}_q_0.84'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
+    ax.plot(horizon_time, q50[:,ind], color='blue', label=f'Baseline Median Prediction')
+    ax.plot(horizon_time, horizon_preds[f'{country}_q_0.5'], color='red', label=f'{model_type} Median Prediction')
     ax.set_title(f'67% Prediction Intervals')
 
     ax = ax_list[1]
@@ -652,6 +656,8 @@ def plot_prediction_and_baseline(
     ax.fill_between(
         horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
     )
+    ax.plot(horizon_time, q50[:,ind], color='blue', label=f'Baseline Median Prediction')
+    ax.plot(horizon_time, horizon_preds[f'{country}_q_0.5'], color='red', label=f'{model_type} Median Prediction')
     ax.set_title(f'90% Prediction Intervals')
 
     handles, labels = [], []

@@ -2,6 +2,8 @@ import numpy as np
 
 import pandas as pd
 
+from sklearn.preprocessing import StandardScaler
+
 import Constants
 from Utils import ForecastingUtils, PreProcessing, PostProcessing
 
@@ -231,80 +233,62 @@ def multiseries_quantiles(
 
     return data_train, data_test, test_preds, horizon_preds, in_sample_preds, best_params
 
-
-def rnn_forecasts(
+def neural_network_multiseries(
         y: np.ndarray,
         countries: list[str],
-        layer_type: str,
-        countries_to_predict: list[str] = None 
     ):
     """
-    Performs probabilistic forecasting on multiple time series by creating a recurrent neural network model for multiple series
+    Performs probabilistic forecasting on multiple time series without considering the relations between different time series, using neural networks
 
     Parameters:
         y (np.ndarray): The input time series matrix of dimensions (m,T)
-        countries (list[str]): The list containing the ISO-3 codes for each country in the dataset
-        arima_order (np.ndarray): The (p,d,q) ARIMA orders of y, of shape (m,3)
-        layer_type (str): The type of recurrent layer to be used, either LSTM or RNN
-        countries_to_predict (list[str]): The codes of countries for which predictions should be made. If None, predictions for the entire dataset are performed
-        
+        countries (list[str]): The list containing the ISO3 codes for each country in the dataset
+
     Returns:
-        pd.DataFrane: The indexed training set
-        pd.DataFrane: The indexed test set
+        pd.DataFrame: The indexed training set
+        pd.DataFrame: The indexed test set
         pd.DataFrame: The prediction intervals for the test set
         pd.DataFrame: The prediction intervals for the horizon
         pd.DataFrame: The in-sample prediction intervals
+        dict: The best parameters
     """
-
-    T = y.shape[1]
-
-    split_ind = int(Constants.train_split*T) 
-
-    test_steps, data_train_pure, data_test_pure, data_all_pure = PreProcessing.preprocess_multivariate_forecast(
+    test_steps, data_train, data_test, data_all = PreProcessing.preprocess_multivariate_forecast(
         countries=countries, y=y
     )
-
-    if countries_to_predict is not None:
-        to_predict = countries_to_predict
-    else:
-        to_predict = countries
-
-    data_train = data_train_pure
-    data_test = data_test_pure
-    data_all = data_all_pure
-
-    test_forecaster, horizon_forecaster = ForecastingUtils.grid_search_rnn(
-        data_train=data_train,
-        data_test=data_test,
-        data_all=data_all,
-        lags_bound=1,
-        layer_type=layer_type,
-        recurrent_layers = np.array([4]),
-        dense_layers = np.array([16]),
-        countries_to_predict=to_predict,
+    scaler = StandardScaler()
+    y_sc = scaler.fit_transform(y.reshape(-1,1)).reshape(y.shape)
+    _, data_train_sc, data_test_sc, data_all_sc = PreProcessing.preprocess_multivariate_forecast(
+        countries, y_sc
     )
 
-    test_forecaster.fit(series=data_train)
-
-    test_preds = test_forecaster.predict_quantiles(
-        steps=test_steps, 
-        quantiles=[0.05, 0.16, 0.84, 0.95], 
-        n_boot=100
+    test_forecaster, horizon_forecaster, best_params = ForecastingUtils.tree_parzen_nn(
+        data_train_sc, data_test_sc, countries
     )
 
-    test_med = test_forecaster.predict_quantiles(steps=test_steps, quantiles=[0.5])
-    test_preds = pd.concat([test_preds, test_med], axis=1)
-
-    horizon_forecaster.fit(series=data_all)
-
-    horizon_preds = horizon_forecaster.predict_quantiles(
-        steps=Constants.horizon,
-        quantiles=[0.05, 0.16, 0.84, 0.95],
-        n_boot = 100
+    test_forecaster.fit(data_train_sc, store_in_sample_residuals=True)
+    quantiles = [0.05,0.16,0.5,0.84,0.95]
+    test_preds = test_forecaster.predict_quantiles(steps=test_steps, quantiles=quantiles)
+    test_preds = PostProcessing.pivot_predictions(test_preds, countries)
+    test_preds = pd.DataFrame(
+        scaler.inverse_transform(test_preds.values),
+        index=test_preds.index,
+        columns=test_preds.columns
     )
 
-    horizon_med = horizon_forecaster.predict_quantiles(steps=Constants.horizon, quantiles=[0.5])
-    horizon_preds = pd.concat([horizon_preds, horizon_med], axis=1)
-    in_sample_preds = ForecastingUtils.predict_in_sample(data_train, horizon_forecaster)
+    horizon_forecaster.fit(data_all_sc, store_in_sample_residuals=True)
+    horizon_preds = horizon_forecaster.predict_quantiles(steps=Constants.horizon, quantiles=quantiles)
+    horizon_preds = PostProcessing.pivot_predictions(horizon_preds, countries)
+    horizon_preds = pd.DataFrame(
+        scaler.inverse_transform(horizon_preds.values),
+        index=horizon_preds.index,
+        columns=horizon_preds.columns
+    )
 
-    return data_train_pure, data_test_pure, test_preds, horizon_preds, in_sample_preds
+    in_sample_preds = ForecastingUtils.predict_in_sample_nn(data_train_sc, horizon_forecaster, countries)
+    in_sample_preds = pd.DataFrame(
+        scaler.inverse_transform(in_sample_preds.values),
+        index=in_sample_preds.index,
+        columns = in_sample_preds.columns
+    )
+
+    return data_train, data_test, test_preds, horizon_preds, in_sample_preds, best_params

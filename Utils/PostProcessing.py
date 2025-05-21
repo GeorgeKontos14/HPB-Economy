@@ -151,9 +151,9 @@ def postprocess_clustering(
         VisualUtils.plot_group_graph(members, edges, colors, thickness, title)
 
 
-def pivot_dataframe(df: pd.DataFrame, pivot_column: str, target_column: str) -> pd.DataFrame:
+def pivot_dataframe(df: pd.DataFrame, pivot_column: str, target_columns: str) -> pd.DataFrame:
     """
-    Transforms a prediction dataframe
+    Transforms a dataframe
 
     Parameters:
         df (pd.DataFrame): The dataframe to transform
@@ -166,7 +166,27 @@ def pivot_dataframe(df: pd.DataFrame, pivot_column: str, target_column: str) -> 
     series = []
     pivot_values = df[pivot_column].unique().tolist()
     for column in pivot_values:
-        series.append(df[df[pivot_column] == column][target_column])
+        series.append(df[df[pivot_column] == column][target_columns])
     concat = pd.concat(series, axis=1)
     concat.columns = pivot_values
     return concat
+
+def pivot_predictions(df: pd.DataFrame, countries: list[str]) -> pd.DataFrame:
+    """
+    Transforms a dataframe of predictions to the appropriate format
+
+    Parameters:
+        df (pd.DataFrame): The dataframe with the predictions
+        countries (list[str]): The countries for which predictions are included in the dataframe
+
+    Returns:
+        pd.DataFrame: The predictions in the desired format
+    """
+    pred_list = []
+    for country in countries:
+        country_preds = df[df['level'] == country]
+        country_preds = country_preds.drop(columns='level')
+        country_preds.columns = [f'{country}_{column}' if column != 'pred' else country for column in country_preds.columns]
+        pred_list.append(country_preds)
+    preds = pd.concat(pred_list, axis=1)
+    return preds

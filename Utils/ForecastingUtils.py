@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
+from sklearn.neural_network import MLPRegressor
 
 from keras.optimizers import Adam # type: ignore
 from keras.losses import MeanSquaredError # type: ignore
@@ -20,9 +21,10 @@ from skforecast.recursive import ForecasterRecursive, ForecasterRecursiveMultiSe
 from hyperopt import hp, fmin, tpe, Trials
 from hyperopt.early_stop import no_progress_loss
 
+import warnings
+
 import Constants
 from Forecasting.ForecasterMultioutput import ForecastDirectMultiOutput
-from Forecasting.ForecasterRNNProb import ForecastRNNProb
 from Forecasting.ForecasterQuantile import ForecasterMultiSeriesQuantile
 from Utils import DataUtils, PostProcessing
 
@@ -387,6 +389,27 @@ def predict_in_sample(data_train: pd.DataFrame, forecaster: ForecasterBase) -> p
         return all_preds
     return all_preds[:remaining_steps]
 
+def predict_in_sample_nn(
+        data_train: pd.DataFrame, forecaster: ForecasterBase, countries: list[str]
+    ) -> pd.DataFrame:
+    """
+    Method for performing in-sample predictions using a neural network
+
+    Parameters:
+        data_all (pd.DataFrame): All the observed data
+        forecaster (ForecasterBase): The trained forecaster model. Could be univariate or multivariate
+        countries (list[str]): The countries for which to make predictions
+    
+    Returns:
+        pd.DataFrame: The in-sample 67% and 90% prediction intervals
+    """
+    size = len(list(forecaster.last_window_.values())[0])
+    remaining_steps = len(data_train)-size
+    first_window = data_train[:size]
+    all_preds = forecaster.predict_quantiles(steps = remaining_steps, last_window=first_window, quantiles = [0.05, 0.16, 0.5, 0.84, 0.95])
+    all_preds = PostProcessing.pivot_predictions(all_preds, countries)
+    return all_preds[:remaining_steps]
+
 def create_univariate_forecaster(
         p: int,
         d: int,
@@ -469,144 +492,41 @@ def create_multivariate_forecaster(
         )
     return forecaster
 
-def create_rnn_forecaster(
-        series: pd.DataFrame,
-        p: list[int],
-        steps: int,
-        level: list[str],
-        layer_type: str,
-        r_u: int,
-        d_u: int    
-    ) -> ForecastRNNProb:
+def create_neural_network(
+    p: list[int],
+    q: int,
+    layer_sizes: list[int],
+    alpha: float
+) -> ForecasterBase:
     """
-    Creates an RNN Forecaster:
+    Creates a recursive multiseries forecaster with a neural network as the underlying regressor
 
     Parameters:
-        series (pd.DataFrame): The input data
-        p (list[int]): The lags for each variable
-        steps (int): The number of future steps to be predicted
-        level (list[str]): The variables to be predicted
-        layer_type (str): The type of recurrent layer to be used, either LSTM or RNN
-        r_u (int): Number of units in the recurrent layer(s)
-        d_u (int): Number of units in each dense layer
-    """
-
-    model = create_and_compile_model(
-        series = series,
-        lags = p,
-        steps = steps,
-        levels = level,
-        recurrent_layer = layer_type,
-        recurrent_units = r_u,
-        dense_units = d_u,
-        optimizer = Adam(learning_rate=0.01),
-        loss=MeanSquaredError()
-    )
-
-    forecaster = ForecastRNNProb(
-        regressor = model,
-        levels = level,
-        lags = p,
-        steps = steps
-    )
-
-    return forecaster
-
-def grid_search_rnn(
-        data_train: pd.DataFrame,
-        data_test: pd.DataFrame,
-        data_all: pd.DataFrame,
-        lags_bound: int,
-        layer_type: str,
-        recurrent_layers: np.ndarray,
-        dense_layers: np.ndarray,
-        countries_to_predict: list[str]
-    ) -> Tuple[ForecastRNNProb, ForecastRNNProb]:
-    """
-    Performs exhaustive search to find the best hyperparameter configuration for a recurrent neural network
-
-    Parameters:
-        data_train (pd.DataFrame): The training set
-        data_test (pd.DataFrame): The test set
-        data_all (pd.DataFrame): The complete dataset
-        lags_bound (int): The maximum number of lags to consider
-        layer_type (str): The type of recurrent layer to be used, either LSTM or RNN
-        recurrent_layers (np.ndarray): The possible numbers of recurrent units
-        dense_layers (np.ndarray): The possible numbers of dense units
-        countries_to_predict (list[str]): The countries for which predictions are made
-        model_type (str): The type of model to create. One of 'ForecasterRecursiveMultiSeries', 'ForecasterDirectMultiVariate', 'ForecastDirectMultiOutput'
-
+        p (list[int]): The amount of lags used for each country
+        q (int): The size of the moving average window
+        layer_sizes (list[int]): The number of neurons in each layer of the neural network
+        alpha (float): The regularization parameter
+    
     Returns:
-        ForecastRNNPron: The forecaster for the test set
-        ForecastRNNPron: The forecaster for the horizon
+        ForecasterBase: The resulting forecaster object
     """
-
-    test_steps = len(data_test)
-    m = len(countries_to_predict)
-    
-    p_list = np.arange(start=1, stop=lags_bound+1)
-    arrays = [p_list, recurrent_layers, dense_layers]
-    grids = np.meshgrid(*arrays, indexing='ij')
-    configurations = np.stack([grid.ravel() for grid in grids], axis=-1)
-
-    interval_lengths = np.zeros((len(configurations), m, 2))
-    cov = np.zeros((len(configurations), m, 2))
-
-    for i, config in enumerate(configurations):
-        p = int(config[0])
-        ru = int(config[1])
-        du = int(config[2])
-
-        forecaster = create_rnn_forecaster(
-            series = data_train,
-            p = p,
-            steps = test_steps,
-            level = countries_to_predict,
-            layer_type = layer_type,
-            r_u = ru,
-            d_u = du
-        )
-
-        forecaster.fit(series = data_train)
-        preds = forecaster.predict_quantiles(steps=test_steps, quantiles=[0.05, 0.16, 0.84, 0.95], n_boot=100)
-        for j, country in enumerate(countries_to_predict):
-            y = data_test[country]
-            pred_lengths67 = interval_width(preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'], country)
-            pred_lengths90 = interval_width(preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'], country)
-            interval_lengths[i][j][0] = pred_lengths67.iloc[-1, 0]
-            interval_lengths[i][j][1] = pred_lengths90.iloc[-1, 0]
-            cov[i][j][0] = probability_coverage(y, preds[f'{country}_q_0.16'], preds[f'{country}_q_0.84'])
-            cov[i][j][1] = probability_coverage(y, preds[f'{country}_q_0.05'], preds[f'{country}_q_0.95'])
-    
-    cov_ratios = cov[:,:,0]/interval_lengths[:,:,0]+cov[:,:,1]/interval_lengths[:,:,1]
-    means = np.mean(cov_ratios, axis=1)
-    ind = np.argmax(means)
-    config = configurations[ind]
-    p = int(config[0])
-    ru = int(config[1])
-    du = int(config[2])
-
-    forecaster_test = create_rnn_forecaster(
-        series = data_train,
-        p = p,
-        steps = test_steps,
-        level = countries_to_predict,
-        layer_type = layer_type,
-        r_u = ru,
-        d_u = du
+    window_features = RollingFeatures(stats=['mean'], window_sizes=q) if q > 0 else None
+    forecaster = ForecasterRecursiveMultiSeries(
+        regressor=MLPRegressor(
+            hidden_layer_sizes=layer_sizes,
+            activation='relu', 
+            solver='adam', 
+            alpha=alpha, 
+            early_stopping=True, 
+            validation_fraction=0.1,
+            learning_rate_init=0.001,
+            max_iter = 500,
+            random_state=41
+        ),
+        lags = p,
+        window_features=window_features
     )
-
-    forecaster_horizon = create_rnn_forecaster(
-        series = data_all,
-        p = p,
-        steps = Constants.horizon,
-        level = countries_to_predict,
-        layer_type = layer_type,
-        r_u = ru,
-        d_u = du
-    )
-
-    return forecaster_test, forecaster_horizon
+    return forecaster
 
 def tree_parzen_univariate(
         data_train: pd.Series,
@@ -686,7 +606,7 @@ def tree_parzen_multivariate(
         data_test: pd.DataFrame,
         countries_to_predict: list[str],
         model_type: str,
-    )-> Tuple[ForecasterBase, ForecasterBase]:
+    )-> Tuple[ForecasterBase, ForecasterBase, dict]:
     """
     Performs hyperparameter tuning for multivariate forecasts using tree-structured Parzen estimation
 
@@ -798,7 +718,7 @@ def tree_parzen_quantile(
         data_test: pd.DataFrame,
         countries_to_predict: list[str],
         model_type: str = "ForecasterMultiSeriesQuantile",
-    )-> Tuple[ForecasterBase, ForecasterBase]:
+    )-> Tuple[ForecasterBase, ForecasterBase, dict]:
     """
     Performs hyperparameter tuning for multivariate quantile forecasts using tree-structured Parzen estimation
 
@@ -896,6 +816,104 @@ def tree_parzen_quantile(
         model_type = model_type,
         steps = Constants.horizon,
         level = countries_to_predict
+    )
+
+    return forecaster_test, forecaster_horizon, best_params
+
+def tree_parzen_nn(
+        data_train: pd.DataFrame,
+        data_test: pd.DataFrame,
+        countries_to_predict: list[str],  
+    )-> Tuple[ForecasterBase, ForecasterBase, dict]:
+    """
+    Performs hyperparameter tuning for neural network forecasts using tree-structured Parzen estimation
+
+    Parameters:
+        data_train (pd.DataFrame): The training set
+        data_test (pd.DataFrame): The test set
+        countries_to_predict (list[str]): The countries for which predictions are made
+
+    Returns:
+        ForecasterBase: The forecaster for the test set
+        ForecasterBase: The forecaster for the horizon
+        dict: The best parameters 
+    """
+    test_steps = len(data_test)
+    n = data_train.shape[1]
+    m = len(countries_to_predict)
+
+    warnings.filterwarnings('ignore')
+
+    search_space = {
+        'alpha': hp.choice('alpha', [1e-5,1e-4,1e-3,1e-2,1e-1,1]),
+        'q': hp.quniform('q', 0, Constants.average_bound, 1),
+        'hidden_layer_sizes': hp.choice('num_layers', [
+            (hp.quniform('layer1_units', 16, 64, 1),),  # One layer
+            (
+                hp.quniform('layer1_units_2', 16, 64, 1), 
+                hp.quniform('layer2_units_2', 16, 64, 1)
+            )         
+        ])
+    }
+    search_space['p'] = [hp.choice(f"p_{i}", list(range(1,Constants.lags_bound))) for i in range(n)]
+
+    def objective(params):
+        p, q, alpha = params['p'], int(params['q']), params['alpha']
+        hidden_layers = tuple(int(x) for x in params['hidden_layer_sizes'])
+
+        model = create_neural_network(p, q, hidden_layers, alpha)
+
+        model.fit(series=data_train, store_in_sample_residuals=True)
+        int_score_67 = 0
+        int_score_90 = 0
+        loss_median = 0
+        q_preds = model.predict_quantiles(
+            steps=test_steps,
+            quantiles=[0.05,0.16,0.5,0.84, 0.95],
+            n_boot=100
+        )
+        q_preds = PostProcessing.pivot_predictions(q_preds, countries_to_predict)     
+        for country in countries_to_predict:
+            y = data_test[country]
+            p_lengths_67 = interval_width(q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'], country)
+            p_lengths_90 = interval_width(q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'], country)
+            lengths_67 = p_lengths_67.iloc[-1,0]
+            lengths_90 = p_lengths_90.iloc[-1,0]
+            cov_67 = probability_coverage(y, q_preds[f'{country}_q_0.16'], q_preds[f'{country}_q_0.84'])
+            cov_90 = probability_coverage(y, q_preds[f'{country}_q_0.05'], q_preds[f'{country}_q_0.95'])
+            int_score_67 += np.sqrt(lengths_67)*np.abs(cov_67-0.67)
+            int_score_90 += np.sqrt(lengths_90)*np.abs(cov_90-0.9)
+            loss_median += pinball_loss(y, q_preds[f'{country}_q_0.5'], 0.5)
+        int_score_67 = int_score_67/m
+        int_score_90 = int_score_90/m
+        loss_median = loss_median/m
+        return {'loss': loss_median+(int_score_67+int_score_90)/2, 'status': 'ok'}
+    
+    trials = Trials()
+    best_params = fmin(
+        fn = objective,
+        space = search_space,
+        algo = tpe.suggest,
+        max_evals = 1500,
+        trials=trials,
+        early_stop_fn=no_progress_loss(150)
+    )
+
+    lags = [int(best_params[f"p_{i}"])+1 for i in range(n)]
+    ma = int(best_params['q'])
+    alpha = best_params['alpha']
+
+    if best_params['num_layers'] == 0:
+        layers = (int(best_params['layer1_units']))
+    else:
+        layers = (int(best_params['layer1_units_2']), int(best_params['layer2_units_2']))
+
+    forecaster_test = create_neural_network(
+        lags, ma, layers, alpha
+    )
+
+    forecaster_horizon = create_neural_network(
+        lags, ma, layers, alpha
     )
 
     return forecaster_test, forecaster_horizon, best_params
