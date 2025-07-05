@@ -230,7 +230,8 @@ def interval_overlap_ratio(
         baseline_low: np.ndarray, 
         baseline_up: np.ndarray,
         country: str,
-        use67: bool = True
+        use67: bool = True,
+        T: int = Constants.horizon
     ) -> float:
     """
     Calculate the interval overlap ratio between the predictions of a model and the baseline for a specific country
@@ -252,19 +253,20 @@ def interval_overlap_ratio(
     else:
         L = preds[f'{country}_q_0.05'].to_numpy()
         U = preds[f'{country}_q_0.95'].to_numpy()        
-    for i in range(Constants.horizon):
+    for i in range(T):
         num = max(0, min(U[i], baseline_up[i])-max(L[i], baseline_low[i]))
         denom = max(U[i], baseline_up[i])-min(L[i], baseline_low[i])
         ratio += num/denom
 
-    return ratio/Constants.horizon
+    return ratio/T
 
 def relative_interval_width_ratio(
         preds: pd.DataFrame, 
         baseline_low: np.ndarray, 
         baseline_up: np.ndarray,
         country: str,
-        use67: bool = True
+        use67: bool = True,
+        T: int = Constants.horizon
     ) -> float:
     """
     Calculate the relative interval width ratio between the predictions of a model and the baseline for a specific country
@@ -287,12 +289,12 @@ def relative_interval_width_ratio(
     else:
         L = preds[f'{country}_q_0.05'].to_numpy()
         U = preds[f'{country}_q_0.95'].to_numpy()  
-    for i in range(Constants.horizon):
+    for i in range(T):
         num = U[i]-L[i]
         denom = baseline_up[i]-baseline_low[i]
         ratio += num/denom
 
-    return ratio/Constants.horizon
+    return ratio/T
 
 def compare_to_baseline(
         countries: list[str],
@@ -300,7 +302,8 @@ def compare_to_baseline(
         q05: np.ndarray,
         q16: np.ndarray,
         q84: np.ndarray,
-        q95: np.ndarray
+        q95: np.ndarray,
+        T: int = Constants.horizon
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Compare the results of a model to the baseline predictions
@@ -332,10 +335,10 @@ def compare_to_baseline(
         baseline16 = q16[:, j]
         baseline84 = q84[:, j]
         baseline95 = q95[:, j]
-        overlap_ratios67[j] = interval_overlap_ratio(pred67, baseline16, baseline84, country)
-        width_ratios67[j] = relative_interval_width_ratio(pred67, baseline16, baseline84, country)
-        overlap_ratios90[j] = interval_overlap_ratio(pred90, baseline05, baseline95, country, use67 =  False)
-        width_ratios90[j] = relative_interval_width_ratio(pred90, baseline05, baseline95, country, use67 =  False)
+        overlap_ratios67[j] = interval_overlap_ratio(pred67, baseline16, baseline84, country, T=T)
+        width_ratios67[j] = relative_interval_width_ratio(pred67, baseline16, baseline84, country, T=T)
+        overlap_ratios90[j] = interval_overlap_ratio(pred90, baseline05, baseline95, country, use67 =  False, T=T)
+        width_ratios90[j] = relative_interval_width_ratio(pred90, baseline05, baseline95, country, use67 =  False, T=T)
 
     print("Interval Overlap Ratios")
     print(f"67% Prediction Intervals")

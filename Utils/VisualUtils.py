@@ -606,6 +606,7 @@ def plot_prediction_and_baseline(
         low_freq: np.ndarray = None,
         title: str = None,
         path: str = None,
+        only_67: bool = False
     ):
     """
     Plot the prediction intervals of a specific model and the baseline on the same plot
@@ -629,10 +630,13 @@ def plot_prediction_and_baseline(
     in_sample_time = np.arange(Constants.start_year, Constants.start_year+Constants.T)
     horizon_time = np.arange(Constants.start_year+Constants.T, Constants.start_year+Constants.T+T_horizon)
 
-    fig, axs = plt.subplots(2, 1, figsize=(14,10))
-    ax_list = axs.flatten()
-
-    ax = ax_list[0]
+    if only_67:
+        fig, ax = plt.subplots(1,1, figsize=(14,5))
+    else:
+        fig, axs = plt.subplots(2, 1, figsize=(14,10))
+        ax_list = axs.flatten()
+        ax = ax_list[0]
+        
     ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
     if low_freq is not None:
         ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
@@ -644,21 +648,22 @@ def plot_prediction_and_baseline(
     )
     ax.plot(horizon_time, q50[:,ind], color='blue', label=f'Baseline Median Prediction')
     ax.plot(horizon_time, horizon_preds[f'{country}_q_0.5'], color='red', label=f'{model_type} Median Prediction')
-    ax.set_title(f'67% Prediction Intervals')
-
-    ax = ax_list[1]
-    ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
-    if low_freq is not None:
-        ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
-    ax.fill_between(
-        horizon_time, q05[:, ind], q95[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
-    )
-    ax.fill_between(
-        horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
-    )
-    ax.plot(horizon_time, q50[:,ind], color='blue', label=f'Baseline Median Prediction')
-    ax.plot(horizon_time, horizon_preds[f'{country}_q_0.5'], color='red', label=f'{model_type} Median Prediction')
-    ax.set_title(f'90% Prediction Intervals')
+    
+    if not only_67:
+        ax.set_title(f'67% Prediction Intervals')
+        ax = ax_list[1]
+        ax.plot(in_sample_time, gdp[ind], color='black', label='Observed Values')
+        if low_freq is not None:
+            ax.plot(in_sample_time, low_freq[:, ind], color='deepskyblue', alpha=0.75, label='Low Frequency Trend')
+        ax.fill_between(
+            horizon_time, q05[:, ind], q95[:, ind], color='lightskyblue', alpha=0.5, label='Baseline Prediction Interval'
+        )
+        ax.fill_between(
+            horizon_time,  horizon_preds[f'{country}_q_0.05'], horizon_preds[f'{country}_q_0.95'], color='tomato', alpha=0.5, label=f'{model_type} Prediction Interval'
+        )
+        ax.plot(horizon_time, q50[:,ind], color='blue', label=f'Baseline Median Prediction')
+        ax.plot(horizon_time, horizon_preds[f'{country}_q_0.5'], color='red', label=f'{model_type} Median Prediction')
+        ax.set_title(f'90% Prediction Intervals')
 
     handles, labels = [], []
     for handle, label in zip(*ax.get_legend_handles_labels()):
